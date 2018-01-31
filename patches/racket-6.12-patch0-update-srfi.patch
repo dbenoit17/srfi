@@ -1,0 +1,4369 @@
+diff -urN racket-6.12-orig/share/links.rktd racket-6.12/share/links.rktd
+--- racket-6.12-orig/share/links.rktd	2018-01-26 16:12:13.000000000 -0500
++++ racket-6.12/share/links.rktd	2018-01-31 12:22:57.600504036 -0500
+@@ -133,6 +133,7 @@
+  (root "pkgs/r5rs-doc")
+  (root "pkgs/srfi-lite-lib")
+  (root "pkgs/srfi-lib")
++ (root "pkgs/srfi-lib-nonfree")
+  (root "pkgs/html-doc")
+  (root "pkgs/images-gui-lib")
+  (root "pkgs/images-doc")
+@@ -176,6 +177,7 @@
+  (root "pkgs/slideshow-exe")
+  (root "pkgs/slideshow-plugin")
+  (root "pkgs/srfi-doc")
++ (root "pkgs/srfi-doc-nonfree")
+  (root "pkgs/syntax-color-doc")
+  (root "pkgs/web-server-lib")
+  (root "pkgs/unix-socket-lib")
+diff -urN racket-6.12-orig/share/pkgs/srfi/info.rkt racket-6.12/share/pkgs/srfi/info.rkt
+--- racket-6.12-orig/share/pkgs/srfi/info.rkt	2018-01-26 16:10:00.000000000 -0500
++++ racket-6.12/share/pkgs/srfi/info.rkt	2018-01-31 12:22:58.139502019 -0500
+@@ -1 +1,16 @@
+-(module info setup/infotab (#%module-begin (define package-content-state (quote (built "6.12"))) (define collection (quote multi)) (define deps (quote ("srfi-lib" "srfi-doc"))) (define implies (quote ("srfi-lib" "srfi-doc"))) (define pkg-desc "Legacy SRFI (Scheme) libraries") (define pkg-authors (quote (mflatt noel chongkai jay)))))
++#lang info
++
++(define collection 'multi)
++
++(define deps '("srfi-lib"
++               "srfi-lib-nonfree"
++               "srfi-doc"
++               "srfi-doc-nonfree"))
++(define implies '("srfi-lib"
++                  "srfi-lib-nonfree"
++                  "srfi-doc"
++                  "srfi-foc-nonfree"))
++
++(define pkg-desc "Legacy SRFI (Scheme) libraries")
++
++(define pkg-authors '(mflatt noel chongkai jay))
+diff -urN racket-6.12-orig/share/pkgs/srfi-doc/info.rkt racket-6.12/share/pkgs/srfi-doc/info.rkt
+--- racket-6.12-orig/share/pkgs/srfi-doc/info.rkt	2018-01-26 16:10:00.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-doc/info.rkt	2018-01-31 12:22:58.139502019 -0500
+@@ -1 +1,24 @@
+-(module info setup/infotab (#%module-begin (define package-content-state (quote (built "6.12"))) (define collection (quote multi)) (define build-deps (quote ("mzscheme-doc" "scheme-lib" "base" "scribble-lib" "srfi-lib" "racket-doc" "r5rs-doc" "r6rs-doc" "compatibility-lib"))) (define update-implies (quote ("srfi-lib"))) (define pkg-desc "documentation part of \"srfi\"") (define pkg-authors (quote (mflatt noel chongkai jay)))))
++#lang info
++
++(define collection 'multi)
++
++(define build-deps '("mzscheme-doc"
++                     "scheme-lib"
++                     "base"
++                     "scribble-lib"
++                     "srfi-lib"
++                     "racket-doc"
++                     "r5rs-doc"
++                     "r6rs-doc"
++                     "compatibility-lib"))
++
++(define deps '("scheme-lib"
++               "base"
++               "scribble-lib"
++               "compatibility-lib"))
++
++(define update-implies '("srfi-lib"))
++
++(define pkg-desc "documentation part of \"srfi\"")
++
++(define pkg-authors '(mflatt noel chongkai jay))
+diff -urN racket-6.12-orig/share/pkgs/srfi-doc/srfi/scribblings/srfi.scrbl racket-6.12/share/pkgs/srfi-doc/srfi/scribblings/srfi.scrbl
+--- racket-6.12-orig/share/pkgs/srfi-doc/srfi/scribblings/srfi.scrbl	2018-01-26 15:34:52.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-doc/srfi/scribblings/srfi.scrbl	2018-01-31 12:22:58.144502000 -0500
+@@ -1,5 +1,6 @@
+ #lang scribble/doc
+-@(require scribble/manual
++@(require srfi/scribblings/util
++          scribble/manual
+           scribble/eval
+           scriblib/render-cond
+           scribble/core
+@@ -8,54 +9,6 @@
+           (for-label scheme/base
+                      racket/stream))
+ 
+-@(define-syntax (srfi stx)
+-  (syntax-case stx ()
+-   [(_ num #:subdir subdir? . title)
+-    (with-syntax ([srfi/n (string->symbol (format "srfi/~a" (syntax-e #'num)))])
+-      #'(begin
+-          (section #:tag (format "srfi-~a" num)
+-                   #:style 'unnumbered
+-                   (format "SRFI ~a: " num)
+-                   . title)
+-          (defmodule srfi/n)
+-          "Original specification: "
+-          (let* ([label (format "SRFI ~a" num)]
+-                 [sub (if subdir? (format "srfi-~a/" num) "")]
+-                 [url (λ (b) (format "~a/srfi-std/~asrfi-~a.html" b sub num))])
+-            (cond-element
+-              [(or latex text) @link[(url "http://docs.racket-lang.org") label]]
+-              [else @link[(url ".") label]]))))]
+-   [(_ num . title) #'(srfi num #:subdir #f . title)]))
+-
+-@;{ The `lst' argument is a list of
+-       (list sym syntactic-form? html-anchor) }
+-@(define (redirect n lst #:subdir [subdir? #f])
+-   (let ([file (if subdir?
+-                 (format "srfi-~a/srfi-~a.html" n n)
+-                 (format "srfi-~a.html" n))]
+-         [mod-path (string->symbol (format "srfi/~a" n))])
+-     (make-binding-redirect-elements mod-path
+-       (map (lambda (b)
+-              (list (car b) (cadr b)
+-                    (build-path "srfi-std" file)
+-                    (caddr b)))
+-            lst))))
+-
+-@(define in-core
+-   (case-lambda
+-     [() (in-core ".")]
+-     [(k) @elem{This SRFI's bindings are also available in
+-                @racketmodname[racket/base]@|k|}]))
+-
+-@(begin
+-  (define-syntax-rule (def-mz mz-if)
+-    (begin
+-      (require (for-label mzscheme))
+-      (define mz-if (racket if))))
+-  (def-mz mz-if))
+-
+-@(define srfi-std (style #f (list (install-resource "srfi-std"))))
+-
+ @; ----------------------------------------------------------------------
+ 
+ @title{SRFIs: Libraries}
+@@ -245,14 +198,6 @@
+ 
+ @; ----------------------------------------
+ 
+-@srfi[5]{A compatible let form with signatures and rest arguments}
+-
+-@redirect[5 '(
+- (let #t "unnamed")
+-)]
+-
+-@; ----------------------------------------
+-
+ @srfi[6]{Basic String Ports}
+ 
+ @redirect[6 '(
+@@ -671,20 +616,6 @@
+ 
+ @; ----------------------------------------
+ 
+-@srfi[29]{Localization}
+-
+-@redirect[29 '(
+- (current-language #f "current-language")
+- (current-country #f "current-country")
+- (current-locale-details #f "current-locale-details")
+- (declare-bundle! #f "declare-bundle!")
+- (store-bundle #f "store-bundle")
+- (load-bundle! #f "load-bundle!")
+- (localized-template #f "localized-template")
+-)]
+-
+-@; ----------------------------------------
+-
+ @srfi[30]{Nested Multi-line Comments}
+ 
+ This SRFI's syntax is part of Racket's default reader.
+diff -urN racket-6.12-orig/share/pkgs/srfi-doc/srfi/scribblings/srfi-std/srfi-29.html racket-6.12/share/pkgs/srfi-doc/srfi/scribblings/srfi-std/srfi-29.html
+--- racket-6.12-orig/share/pkgs/srfi-doc/srfi/scribblings/srfi-std/srfi-29.html	2018-01-26 15:34:52.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-doc/srfi/scribblings/srfi-std/srfi-29.html	1969-12-31 19:00:00.000000000 -0500
+@@ -1,507 +0,0 @@
+-<!DOCTYPE html PUBLIC "-//IETF//DTD HTML//EN">
+-<html>
+-  <head>
+-    <meta name="generator" content="HTML Tidy, see www.w3.org">
+-    <title>SRFI 29: Localization</title>
+-    <meta name="author" content="Scott G. Miller">
+-    <meta name="description" content="Localization">
+-  </head>
+-  <body>
+-    <H1>Title</H1>
+-
+-    SRFI 29: Localization 
+-
+-    <H1>Author</H1>
+-
+-    Scott G. Miller 
+-
+-    <H1>Abstract</H1>
+-
+-    This document specifies an interface to retrieving and
+-    displaying locale sensitive messages. A Scheme program can
+-    register one or more translations of templated messages, and
+-    then write Scheme code that can transparently retrieve the
+-    appropriate message for the locale under which the Scheme
+-    system is running. <br>
+-     
+-
+-    <H1>Rationale</H1>
+-
+-    <p>As any programmer that has ever had to deal with making his
+-    or her code readable in more than one locale, the process of
+-    sufficiently abstracting program messages from their
+-    presentation to the user is non-trivial without help from the
+-    programming language. Most modern programming language
+-    libraries do provide some mechanism for performing this
+-    separation.</p>
+-
+-    <p>A portable API that allows a piece of code to run without
+-    modification in different countries and under different
+-    languages is a must for any non-trivial software project.
+-    &nbsp;The interface should separate the logic of a program from
+-    the myriad of translations that may be necessary.</p>
+-
+-    <p>The interface described in this document provides such
+-    functionality. The underlying implementation is also allowed to
+-    use whatever datastructures it likes to provide access to the
+-    translations in the most efficient manner possible. &nbsp;In
+-    addition, the implementation is provided with standardized
+-    functions that programs will use for accessing an external,
+-    unspecified repository of translations.</p>
+-
+-    <p>This interface <i>does not</i> cover all aspects of
+-    localization, including support for non-latin characters,
+-    number and date formatting, etc. Such functionality is the
+-    scope of a future SRFI that may extend this one.</p>
+-
+-    <H1>Dependencies</H1>
+-
+-    An SRFI-29 conformant implementation must also implement
+-    SRFI-28, Basic Format Strings. Message templates are strings
+-    that must be processed by the <tt>format</tt> function
+-    specified in that SRFI. 
+-
+-    <H1>Specification</H1>
+-
+-    <h3>Message Bundles</h3>
+-
+-    <p>A Message Bundle is a set of message templates and their
+-    identifying keys. Each bundle contains one or more such
+-    key/value pairs. The bundle itself is associated with a
+-    <i>bundle specifier</i> which uniquely identifies the
+-    bundle.</p>
+-
+-    <h3>Bundle Specifiers</h3>
+-
+-    <p>A Bundle Specifier is a Scheme list that describes, in order
+-    of importance, the package and locale of a message bundle.
+-    &nbsp;In most cases, a locale specifier will have between one
+-    and three elements. The first element is a symbol denoting the
+-    package for which this bundle applies. The second and third
+-    elements denote a <i>locale</i>. The second element (first
+-    element of the locale) if present, is the two letter, ISO 639-1
+-    language code for the bundle. The third element, if present, is
+-    a two letter ISO 3166-1 country code. &nbsp;In some cases, a
+-    fourth element may be present, specifying the encoding used for
+-    the bundle. &nbsp;All bundle specifier elements are Scheme
+-    symbols.</p>
+-
+-    <p>If only one translation is provided, it should be designated
+-    only by a package name, for example <tt>(mathlib)</tt>. This
+-    translation is called the <i>default</i> translation.</p>
+-
+-    <h3>Bundle Searching</h3>
+-
+-    <p>When a message template is retrieved from a bundle, the
+-    Scheme implementation will provide the locale under which the
+-    system is currently running. When the template is retrieved,
+-    the package name will be specified. The Scheme system should
+-    construct a Bundle Specifier from the provided package name and
+-    the active locale. For example, when retrieving a message
+-    template for French Canadian, in the <tt>mathlib</tt> package,
+-    the bundle specifier '<tt>(mathlib fr ca)</tt>' is used. A
+-    program may also retrieve the elements of the current locale
+-    using the no-argument procedures:</p>
+-
+-    <p><b><a name="current-language"></a><tt>current-language</tt></b> <tt>-&gt;
+-    <i>symbol</i></tt><br>
+-     <tt><b>current-language</b> <i>symbol</i> -&gt;
+-    undefined</tt><br>
+-    </p>
+-
+-    <blockquote>
+-      When given no arguments, returns the current ISO 639-1
+-      language code as a symbol. &nbsp;If provided with an
+-      argument, the current language is set to that named by the
+-      symbol for the currently executing Scheme thread (or for the
+-      entire Scheme system if such a distinction is not possible).
+-      &nbsp;
+-    </blockquote>
+-
+-    <p><b><a name="current-country"></a><tt>current-country</tt></b> <tt>-&gt;
+-    <i>symbol</i></tt><br>
+-     <tt><b>current-country</b> <i>symbol</i> -&gt;
+-    undefined</tt><br>
+-    </p>
+-
+-    <blockquote>
+-      returns the current ISO 3166-1 country code as a symbol.
+-      &nbsp;If provided with an argument, the current country is
+-      set to that named by the symbol for the currently executing
+-      Scheme thread (or for the entire Scheme system if such a
+-      distinction is not possible). &nbsp;&nbsp;
+-    </blockquote>
+-
+-    <p><b><a name="current-locale-details"></a><tt>current-locale-details</tt></b> <tt>-&gt; <i>list of
+-    symbol</i></tt>s<br>
+-     <tt><b>current-locale-details</b> <i>list-of-symbols</i> -&gt;
+-    undefined</tt><br>
+-    </p>
+-
+-    <blockquote>
+-      Returns a list of additional locale details as a list of
+-      symbols. &nbsp;This list may contain information about
+-      encodings or other more specific information. &nbsp;If
+-      provided with an argument, the current locale details are set
+-      to those given in the currently executing Scheme thread (or
+-      for the entire Scheme system if such a distinction is not
+-      possible).&nbsp;
+-    </blockquote>
+-
+-    <p>The Scheme System should first check for a bundle with the
+-    exact name provided. If no such bundle is found, the last
+-    element from the list is removed and a search is tried for a
+-    bundle with that name. If no bundle is then found, the list is
+-    shortened by removing the last element again. If no message is
+-    found and the bundle specifier is now the empty list, an error
+-    should be raised.</p>
+-
+-    <p>The reason for this search order is to provide the most
+-    locale sensitive template possible, but to fall back on more
+-    general templates if a translation has not yet been provided
+-    for the given locale.</p>
+-
+-    <h3>Message Templates</h3>
+-
+-    <p>A message template is a localized message that may or may
+-    not contain one of a number of formatting codes. A message
+-    template is a Scheme string. The string is of a form that can
+-    be processed by the <tt>format</tt> procedure found in many
+-    Scheme systems and formally specified in SRFI-28 (Basic Format
+-    Strings).</p>
+-
+-    <p>This SRFI also extends SRFI-28 to provide an additional
+-    <tt>format</tt> escape code:</p>
+-
+-    <blockquote>
+-      <tt>~[n]@*</tt> - Causes a value-requiring escape code that
+-      follows this code immediately to reference the [N]'th
+-      optional value absolutely, rather than the next unconsumed
+-      value. The referenced value is <i>not</i> consumed.
+-    </blockquote>
+-    This extension allows optional values to be positionally
+-    referenced, so that message templates can be constructed that
+-    can produce the proper word ordering for a language. 
+-
+-    <h3>Preparing Bundles</h3>
+-    Before a bundle may be used by the Scheme system to retrieve
+-    localized template messages, they must be made available to the
+-    Scheme system. &nbsp;This SRFI specifies a way to portably
+-    define the bundles, as well as store them in and retrieve them
+-    from an unspecified system which may be provided by resources
+-    outside the Scheme system.<br>
+-     
+-
+-    <p><b><a name="declare-bundle!"></a><tt>declare-bundle!</tt></b> <tt><i>bundle-specifier
+-    association-list</i> -&gt; undefined<br>
+-    </tt></p>
+-
+-    <blockquote>
+-      Declares a new bundle named by the given bundle-specifier.
+-      &nbsp;The contents of the bundle are defined by the provided
+-      association list. &nbsp;The list contains associations
+-      between Scheme symbols and the message templates (Scheme
+-      strings) they name. &nbsp;If a bundle already exists with the
+-      given name, it is overwritten with the newly declared
+-      bundle.<br>
+-    </blockquote>
+-    <tt><a name="store-bundle"></a><b>store-bundle</b> <i>bundle-specifier</i> -&gt;
+-    boolean</tt><br>
+-     
+-
+-    <blockquote>
+-      Attempts to store a bundle named by the given bundle
+-      specifier, and previously made available using
+-      <tt>declare-bundle!</tt> or <tt>load-bundle!</tt>, in an
+-      unspecified mechanism that may be persistent across Scheme
+-      system restarts. &nbsp;If successful, a non-false value is
+-      returned. &nbsp;If unsuccessful, <tt>#f</tt> is returned.<br>
+-    </blockquote>
+-    <tt><a name="load-bundle!"></a><b>load-bundle!</b> <i>bundle-specifier</i> -&gt;
+-    boolean</tt><br>
+-     
+-
+-    <blockquote>
+-      Attempts to retrieve a bundle from an unspecified mechanism
+-      which stores bundles outside the Scheme system. &nbsp;If the
+-      bundle was retrieved successfully, the function returns a
+-      non-false value, and the bundle is immediately available to
+-      the Scheme system. If the bundle could not be found or loaded
+-      successfully, the function returns <tt>#f</tt>, and the
+-      Scheme system's bundle registry remains unaffected.<br>
+-    </blockquote>
+-    A compliant Scheme system may choose not to provide any
+-    external mechanism to store localized bundles. &nbsp;If it does
+-    not, it must still provide implementations for
+-    <tt>store-bundle</tt> and <tt>load-bundle!</tt>. In such a
+-    case, both functions must return <tt>#f</tt> regardless of the
+-    arguments given. Users of this SRFI should recognize that the
+-    inability to load or store a localized bundle in an external
+-    repository is <i>not</i> a fatal error.<br>
+-     
+-
+-    <h3>Retrieving Localized Message Templates</h3>
+-
+-    <p><a name="localized-template"></a><b><tt>localized-template</tt></b> <i><tt>package-name
+-    message-template-name</tt></i> <tt>-&gt; <i>string or #f<br>
+-    </i></tt></p>
+-
+-    <blockquote>
+-      Retrieves a localized message template for the given package
+-      name and the given message template name (both symbols).
+-      &nbsp;If no such message could be found, false (#f) is
+-      returned.<br>
+-      <br>
+-    </blockquote>
+-    After retrieving a template, the calling program can use
+-    <tt>format</tt> to produce a string that can be displayed to
+-    the user.<br>
+-     
+-
+-    <h2>Examples</h2>
+-    The below example makes use of SRFI-29 to display simple,
+-    localized messages. &nbsp;It also defines its bundles in such a
+-    way that the Scheme system may store and retrieve the bundles
+-    from a more efficient system catalog, if available.<br>
+-     
+-<pre>
+-(let ((translations
+-       '(((en) . ((time . "Its ~a, ~a.")
+-                (goodbye . "Goodbye, ~a.")))
+-         ((fr) . ((time . "~1@*~a, c'est ~a.")
+-                (goodbye . "Au revoir, ~a."))))))
+-  (for-each (lambda (translation)
+-              (let ((bundle-name (cons 'hello-program (car translation))))
+-                (if (not (load-bundle! bundle-name))
+-                    (begin
+-                     (declare-bundle! bundle-name (cdr translation))
+-                     (store-bundle! bundle-name)))))
+-             translations))
+-
+-(define localized-message
+-  (lambda (message-name . args)
+-    (apply format (cons (localized-template 'hello-program
+-                                            message-name)
+-                        args))))
+-
+-(let ((myname "Fred"))
+-  (display (localized-message 'time "12:00" myname))
+-  (display #\newline)
+-
+-  (display (localized-message 'goodbye myname))
+-  (display #\newline))
+-
+-;; Displays (English):
+-;; Its 12:00, Fred.
+-;; Goodbye, Fred.
+-;;
+-;; French:
+-;; Fred, c'est 12:00.
+-;; Au revoir, Fred.
+-</pre>
+-
+-    <H1>Implementation</H1>
+-
+-    <p>The implementation requires that the Scheme system provide a
+-    definition for <tt>current-language</tt> and
+-    <tt>current-country</tt> capable of distinguishing the correct
+-    locale present during a Scheme session. The definitions of
+-    those functions in the reference implementation are not capable
+-    of that distinction. Their implementation is provided only so
+-    that the following code can run in any R4RS scheme system.
+-    &nbsp;<br>
+-    </p>
+-
+-    <p>In addition, the below implementation of a compliant
+-    <tt>format</tt> requires SRFI-6 (Basic String Ports) and
+-    SRFI-23 (Error reporting)</p>
+-<pre>
+-;; The association list in which bundles will be stored
+-(define *localization-bundles* '())
+-
+-;; The current-language and current-country functions provided
+-;; here must be rewritten for each Scheme system to default to the
+-;; actual locale of the session
+-(define current-language
+-  (let ((current-language-value 'en))
+-    (lambda args
+-      (if (null? args)
+-          current-language-value
+-          (set! current-language-value (car args))))))
+-
+-(define current-country
+-  (let ((current-country-value 'us))
+-    (lambda args
+-      (if (null? args)
+-          current-country-value
+-          (set! current-country-value (car args))))))
+-
+-;; The load-bundle! and store-bundle! both return #f in this
+-;; reference implementation.  A compliant implementation need
+-;; not rewrite these procedures.
+-(define load-bundle!
+-  (lambda (bundle-specifier)
+-    #f))
+-
+-(define store-bundle!
+-  (lambda (bundle-specifier)
+-    #f))
+-
+-;; Declare a bundle of templates with a given bundle specifier
+-(define declare-bundle!
+-  (letrec ((remove-old-bundle
+-            (lambda (specifier bundle)
+-              (cond ((null? bundle) '())
+-                    ((equal? (caar bundle) specifier)
+-                     (cdr bundle))
+-                    (else (cons (car bundle)
+-                                (remove-old-bundle specifier
+-                                                   (cdr bundle))))))))
+-    (lambda (bundle-specifier bundle-assoc-list)
+-      (set! *localization-bundles*
+-            (cons (cons bundle-specifier bundle-assoc-list)
+-                  (remove-old-bundle bundle-specifier
+-                                     *localization-bundles*))))))
+-
+-;;Retrieve a localized template given its package name and a template name
+-(define localized-template
+-  (letrec ((rdc
+-            (lambda (ls)
+-              (if (null? (cdr ls))
+-                  '()
+-                  (cons (car ls) (rdc (cdr ls))))))
+-           (find-bundle
+-            (lambda (specifier template-name)
+-              (cond ((assoc specifier *localization-bundles*) =&gt;
+-                     (lambda (bundle) bundle))
+-                    ((null? specifier) #f)
+-                    (else (find-bundle (rdc specifier)
+-                                       template-name))))))
+-    (lambda (package-name template-name)
+-      (let loop ((specifier (cons package-name
+-                                  (list (current-language)
+-                                        (current-country)))))
+-        (and (not (null? specifier))
+-             (let ((bundle (find-bundle specifier template-name)))
+-               (and bundle
+-                    (cond ((assq template-name bundle) =&gt; cdr)
+-                          ((null? (cdr specifier)) #f)
+-                          (else (loop (rdc specifier)))))))))))
+-
+-;;An SRFI-28 and SRFI-29 compliant version of format.  It requires
+-;;SRFI-23 for error reporting.
+-(define format
+-  (lambda (format-string . objects)
+-    (let ((buffer (open-output-string)))
+-      (let loop ((format-list (string-&gt;list format-string))
+-                 (objects objects)
+-                 (object-override #f))
+-        (cond ((null? format-list) (get-output-string buffer))
+-              ((char=? (car format-list) #\~)
+-               (cond ((null? (cdr format-list))
+-                      (error 'format "Incomplete escape sequence"))
+-                     ((char-numeric? (cadr format-list))
+-                      (let posloop ((fl (cddr format-list))
+-                                    (pos (string-&gt;number
+-                                          (string (cadr format-list)))))
+-                        (cond ((null? fl)
+-                               (error 'format "Incomplete escape sequence"))
+-                              ((and (eq? (car fl) '#\@)
+-                                    (null? (cdr fl)))
+-                                    (error 'format "Incomplete escape sequence"))
+-                              ((and (eq? (car fl) '#\@)
+-                                    (eq? (cadr fl) '#\*))
+-                               (loop (cddr fl) objects (list-ref objects pos)))
+-                              (else
+-                                (posloop (cdr fl)
+-                                         (+ (* 10 pos)
+-                                            (string-&gt;number
+-                                             (string (car fl)))))))))
+-                     (else
+-                       (case (cadr format-list)
+-                         ((#\a)
+-                          (cond (object-override
+-                                 (begin
+-                                   (display object-override buffer)
+-                                   (loop (cddr format-list) objects #f)))
+-                                ((null? objects)
+-                                 (error 'format "No value for escape sequence"))
+-                                (else
+-                                  (begin
+-                                    (display (car objects) buffer)
+-                                    (loop (cddr format-list)
+-                                          (cdr objects) #f)))))
+-                         ((#\s)
+-                          (cond (object-override
+-                                 (begin
+-                                   (display object-override buffer)
+-                                   (loop (cddr format-list) objects #f)))
+-                                ((null? objects)
+-                                 (error 'format "No value for escape sequence"))
+-                                (else
+-                                  (begin
+-                                    (write (car objects) buffer)
+-                                    (loop (cddr format-list)
+-                                          (cdr objects) #f)))))
+-                         ((#\%)
+-                          (if object-override
+-                              (error 'format "Escape sequence following positional override does not require a value"))
+-                          (display #\newline buffer)
+-                          (loop (cddr format-list) objects #f))
+-                        ((#\~)
+-                          (if object-override
+-                              (error 'format "Escape sequence following positional override does not require a value"))
+-                          (display #\~ buffer)
+-                          (loop (cddr format-list) objects #f))
+-                         (else
+-                           (error 'format "Unrecognized escape sequence"))))))
+-              (else (display (car format-list) buffer)
+-                    (loop (cdr format-list) objects #f)))))))
+-
+-</pre>
+-
+-    <H1>Copyright</H1>
+-
+-    Copyright (C) Scott G. Miller (2002). All Rights Reserved. 
+-
+-    <p>This document and translations of it may be copied and
+-    furnished to others, and derivative works that comment on or
+-    otherwise explain it or assist in its implementation may be
+-    prepared, copied, published and distributed, in whole or in
+-    part, without restriction of any kind, provided that the above
+-    copyright notice and this paragraph are included on all such
+-    copies and derivative works. However, this document itself may
+-    not be modified in any way, such as by removing the copyright
+-    notice or references to the Scheme Request For Implementation
+-    process or editors, except as needed for the purpose of
+-    developing SRFIs in which case the procedures for copyrights
+-    defined in the SRFI process must be followed, or as required to
+-    translate it into languages other than English.</p>
+-
+-    <p>The limited permissions granted above are perpetual and will
+-    not be revoked by the authors or their successors or
+-    assigns.</p>
+-
+-    <p>This document and the information contained herein is
+-    provided on an "AS IS" basis and THE AUTHOR AND THE SRFI
+-    EDITORS DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING
+-    BUT NOT LIMITED TO ANY WARRANTY THAT THE USE OF THE INFORMATION
+-    HEREIN WILL NOT INFRINGE ANY RIGHTS OR ANY IMPLIED WARRANTIES
+-    OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.</p>
+-    <hr>
+-
+-    <address>
+-      Editor: <a href="mailto:srfi-editors@srfi.schemers.org">David
+-      Rush</a>
+-    </address>
+-
+-    <address>
+-      Author: <a href="mailto:scgmille@freenetproject.org">Scott G.
+-      Miller</a>
+-    </address>
+-    <!-- Created: Tue Sep 29 19:20:08 EDT 1998 -->
+-    <!-- hhmts start -->Last modified: Mon Jun 17 12:00:08 Pacific
+-    Daylight Time 2002 <!-- hhmts end --> <br>
+-  </body>
+-</html>
+-
+diff -urN racket-6.12-orig/share/pkgs/srfi-doc/srfi/scribblings/srfi-std/srfi-5.html racket-6.12/share/pkgs/srfi-doc/srfi/scribblings/srfi-std/srfi-5.html
+--- racket-6.12-orig/share/pkgs/srfi-doc/srfi/scribblings/srfi-std/srfi-5.html	2018-01-26 15:34:52.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-doc/srfi/scribblings/srfi-std/srfi-5.html	1969-12-31 19:00:00.000000000 -0500
+@@ -1,345 +0,0 @@
+-<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 3.2//EN">
+-<html>
+-<head>
+-   <title>SRFI 5: A compatible let form with signatures and rest arguments</title>
+-</head>
+-<body>
+-
+-<H1>Title</H1>
+-
+-SRFI-5: A compatible <code>let</code> form with signatures and rest arguments
+-
+-<H1>Author</H1>
+-
+-Andy Gaynor
+-
+-<H1>Status</H1>
+-
+-This SRFI is currently in ``final'' status.  To see an explanation of each status that a SRFI can hold, see <A HREF="http://srfi.schemers.org/srfi-process.html">here</A>.
+-You can access the discussion on this SRFI via <A HREF="http://srfi.schemers.org/srfi-5/mail-archive/maillist.html">the archive of the mailing list</A>.
+-<P><UL>
+-<LI>Received: 1999/2/2
+-<LI>Draft: 1999/2/10-1999/04/12
+-<LI>Final: 1999/4/26
+-<LI>Revised reference implementation: 2003/01/27
+-</UL>
+-
+-<H1>Abstract</H1>
+-
+-The <i>named-let</i> incarnation of the <code>let</code> form has two slight
+-inconsistencies with the <code>define</code> form.  As defined, the <code>let</code>
+-form makes no accommodation for rest arguments, an issue of functionality
+-and consistency.  As defined, the <code>let</code> form does not accommodate
+-signature-style syntax, an issue of aesthetics and consistency.  Both
+-issues are addressed here in a manner which is compatible with the traditional
+-<code>let</code> form but for minor extensions.
+-
+-<H1>Rationale</H1>
+-
+-<H2>Signature-style Syntax</H2>
+-
+-Consider the following two equivalent definitions:
+-
+-<p><pre>
+-(define fibonacci
+-  (lambda (n i f0 f1)
+-    (if (= i n)
+-      f0
+-      (fibonacci n (+ i 1) f1 (+ f0 f1)))))
+-
+-(define (fibonacci n i f0 f1)
+-  (if (= i n)
+-    f0
+-    (fibonacci n (+ i 1) f1 (+ f0 f1))))
+-</pre>
+-
+-Although there is a named-let analog for the former form, there is none
+-for the latter.  To wit, suppose one wished to compute the 10th element
+-of the Fibonacci sequence using a named let:
+-
+-<p>
+-<pre>
+-(let fibonacci ((n 10) (i 0) (f0 0) (f1 1))
+-  (if (= i n)
+-    f0
+-    (fibonacci n (+ i 1) f1 (+ f0 f1))))
+-Values: 55
+-</pre>
+-
+-As it stands, one cannot equivalently write
+-
+-<p>
+-<pre>
+-(let (fibonacci (n 10) (i 0) (f0 0) (f1 1))
+-  (if (= i n)
+-    f0
+-    (fibonacci n (+ i 1) f1 (+ f0 f1))))
+-</pre>
+-
+-which is consistent with <code>define</code>'s signature-style form.
+-<p>Those that favor the signature style may prefer this extension. 
+-In any case, it may be more appropriate to include all bound names within
+-the binding section.  As presented, this straightforward extension
+-introduces no ambiguity or incompatibility with the existing definition
+-of let.
+-
+-<H2>Rest Arguments</H2>
+-
+-As it stands, one cannot write a named let with rest arguments, as in
+-
+-<p>
+-<pre>
+-(let (blast (port (current-output-port)) . (x (+ 1 2) 4 5))
+-  (if (null? x)
+-    'just-a-silly-contrived-example
+-    (begin
+-      (write (car x) port)
+-      (apply blast port (cdr x)))))
+-</pre>
+-
+-otherwise equivalent to
+-
+-<p>
+-<pre>
+-(letrec ((blast (lambda (port . x)
+-		  (if (null? x)
+-		      'just-a-silly-contrived-example
+-		      (begin
+-			(write (car x) port)
+-			(apply blast port (cdr x)))))))
+-  (blast (current-output-port) (+ 1 2) 4 5))
+-</pre>
+-
+-While this example is rather contrived, the functionality is not. 
+-There are several times when the author has used this construct in practice. 
+-Regardless, there is little reason to deny the <code>let</code> form access to
+-all the features of lambda functionality.
+-
+-<H2>Symbols in Binding Sections</H2>
+-
+-Both the features above rely upon the placement of symbols in <code>let</code>
+-binding lists (this statement is intentially simplistic).  The only
+-other apparent use of such symbol placement is to tersely bind variables
+-to unspecified values.  For example, one might desire to use
+-<code>(let (foo bar baz) ...)</code>
+-to bind <code>foo</code>, <code>bar</code>, and <code>baz</code> to
+-unspecified values.
+-
+-<p>This usage is considered less important in light of the rationales
+-presented above, and an alternate syntax is immediately apparent, as
+-in <code>(let ((foo) (bar) (baz)) ...)</code> This may even
+-be preferable, consistently parenthesizing normal binding clauses.
+-
+-<H1>Specification</H1>
+-
+-<H2>Syntax</H2>
+-
+-<p>
+-A formal specification of the syntax follows.  Below, body, expression,
+-and identifier are free.  Each instantiation of binding-name must be
+-unique.
+-</p>
+-
+-<p>
+-<pre>
+-            let = "(" "let" let-bindings body ")"
+-    expressions = nothing | expression expressions
+-   let-bindings = let-name bindings
+-                | "(" let-name "." bindings ")"
+-       let-name = identifier
+-       bindings = "(" ")"
+-                | rest-binding
+-                | "(" normal-bindings ["." rest-binding] ")"
+-normal-bindings = nothing
+-                | normal-binding normal-bindings
+- normal-binding = "(" binding-name expression ")"
+-   binding-name = identifier
+-   rest-binding = "(" binding-name expressions ")"
+-</pre>
+-
+-<p>
+-For clarity and convenience, an informal specification follows.
+-</p>
+-
+-<ol>
+-<li><a name="unnamed">Unnamed</a>
+-
+-<p><pre>
+-(let ((&lt;parameter&gt; &lt;argument&gt;)...) 
+-  &lt;body&gt;...)
+-</pre>
+-</li>
+-
+-<li><a name="named-non-sig">
+-Named, non-signature-style, no rest argument</a>
+-
+-<p><pre>
+-(let &lt;name&gt; ((&lt;parameter&gt; &lt;argument&gt;)...)
+-  &lt;body&gt;...)
+-</pre>
+-</li>
+-
+-<li><a name="named-sig">Named, signature-style,  no rest argument</a>
+-
+-<p><pre>
+-(let (&lt;name&gt; (&lt;parameter&gt; &lt;argument&gt;)...)
+-  &lt;body&gt;...)
+-</pre>
+-</li>
+-
+-<li><a name="named-non-sig-rest">Named, non-signature-style, rest argument</a>
+-
+-<p><pre>
+-(let &lt;name&gt; ((&lt;parameter&gt; &lt;argument&gt;)...
+-    
+-. (&lt;rest-parameter&gt; &lt;rest-argument&gt;...))
+-  &lt;body&gt;...)
+-</pre>
+-
+-<li><a name="named-sig-rest">Named, signature-style, rest argument</a>
+-
+-<p><pre>
+-(let (&lt;name&gt; (&lt;parameter&gt; &lt;argument&gt;)...
+-   
+-. (&lt;rest-parameter&gt; &lt;rest-argument&gt;...))
+-  &lt;body&gt;...)
+-</pre>
+-</li>
+-</ol>
+-
+-<H2>Semantics</H2>
+-
+-Let <code>$lambda</code> and <code>$letrec</code> be hygienic bindings for the <code>lambda</code>
+-and <code>letrec</code> forms, respectively.
+-
+-<ul>
+-<li>For informal syntax 1:
+-
+-<p><pre>
+-(($lambda (&lt;parameter&gt;...) &lt;body&gt;...) &lt;argument&gt;...)
+-</pre>
+-</li>
+-
+-<li>For informal syntaxes 2 and 3:
+-
+-<p>
+-<pre>
+-($letrec ((&lt;name&gt; ($lambda (&lt;parameter&gt;...) &lt;body&gt;...)))
+-  (&lt;name&gt; &lt;argument&gt;...))
+-</pre>
+-</li>
+-
+-<li>For informal syntaxes 4 and 5:
+-
+-<p>
+-<pre>
+-($letrec ((&lt;name&gt; ($lambda (&lt;parameter&gt;...
+-   
+-. &lt;rest-parameter&gt;) &lt;body&gt;...))) 
+-  (&lt;name&gt; &lt;argument&gt;... &lt;rest-argument&gt;...))
+-</pre>
+-</li>
+-</ul>
+-
+-<H1>Implementation</H1>
+-
+-Here is an implementation using <code>SYNTAX-RULES</code>.
+-
+-<p>
+-<pre>
+-;; Use your own standard let.
+-;; Or call a lambda.
+-;; (define-syntax standard-let
+-;;
+-;;   (syntax-rules ()
+-;;
+-;;     ((let ((var val) ...) body ...)
+-;;      ((lambda (var ...) body ...) val ...))))
+-
+-(define-syntax let
+-
+-  (syntax-rules ()
+-
+-    ;; No bindings: use standard-let.
+-    ((let () body ...)
+-     (standard-let () body ...))
+-    ;; Or call a lambda.
+-    ;; ((lambda () body ...))
+-
+-    ;; All standard bindings: use standard-let.
+-    ((let ((var val) ...) body ...)
+-     (standard-let ((var val) ...) body ...))
+-    ;; Or call a lambda.
+-    ;; ((lambda (var ...) body ...) val ...)
+-
+-    ;; One standard binding: loop.
+-    ;; The all-standard-bindings clause didn't match,
+-    ;; so there must be a rest binding.
+-    ((let ((var val) . bindings) body ...)
+-     (let-loop #f bindings (var) (val) (body ...)))
+-
+-    ;; Signature-style name: loop.
+-    ((let (name binding ...) body ...)
+-     (let-loop name (binding ...) () () (body ...)))
+-
+-    ;; defun-style name: loop.
+-    ((let name bindings body ...)
+-     (let-loop name bindings () () (body ...)))))
+-
+-(define-syntax let-loop
+-
+-  (syntax-rules ()
+-
+-    ;; Standard binding: destructure and loop.
+-    ((let-loop name ((var0 val0) binding ...) (var ...     ) (val ...     ) body)
+-     (let-loop name (            binding ...) (var ... var0) (val ... val0) body))
+-
+-    ;; Rest binding, no name: use standard-let, listing the rest values.
+-    ;; Because of let's first clause, there is no "no bindings, no name" clause.
+-    ((let-loop #f (rest-var rest-val ...) (var ...) (val ...) body)
+-     (standard-let ((var val) ... (rest-var (list rest-val ...))) . body))
+-    ;; Or call a lambda with a rest parameter on all values.
+-    ;; ((lambda (var ... . rest-var) . body) val ... rest-val ...))
+-    ;; Or use one of several other reasonable alternatives.
+-
+-    ;; No bindings, name: call a letrec'ed lambda.
+-    ((let-loop name () (var ...) (val ...) body)
+-     ((letrec ((name (lambda (var ...) . body)))
+-        name)
+-      val ...))
+-
+-    ;; Rest binding, name: call a letrec'ed lambda.
+-    ((let-loop name (rest-var rest-val ...) (var ...) (val ...) body)
+-     ((letrec ((name (lambda (var ... . rest-var) . body)))
+-        name)
+-      val ... rest-val ...))))
+-</pre>
+-
+-
+-<H1>Copyright</H1>
+-
+-Copyright (C) Andy Gaynor (1999). All Rights Reserved.
+-<p>This document and translations of it may be copied and furnished to
+-others, and derivative works that comment on or otherwise explain it or
+-assist in its implementation may be prepared, copied, published and distributed,
+-in whole or in part, without restriction of any kind, provided that the
+-above copyright notice and this paragraph are included on all such copies
+-and derivative works. However, this document itself may not be modified
+-in any way, such as by removing the copyright notice or references to the
+-Scheme Request For Implementation process or editors, except as needed
+-for the purpose of developing SRFIs in which case the procedures for copyrights
+-defined in the SRFI process must be followed, or as required to translate
+-it into languages other than English.
+-<p>The limited permissions granted above are perpetual and will not be
+-revoked by the authors or their successors or assigns.
+-<p>This document and the information contained herein is provided on an
+-"AS IS" basis and THE AUTHOR AND THE SRFI EDITORS DISCLAIM ALL WARRANTIES,
+-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTY THAT THE
+-USE OF THE INFORMATION HEREIN WILL NOT INFRINGE ANY RIGHTS OR ANY IMPLIED
+-WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
+-
+-    <hr>
+-    <address>Editor: <a href="mailto:srfi-editors@srfi.schemers.org">Mike Sperber</a></address>
+-
+-</body>
+-</html>
+diff -urN racket-6.12-orig/share/pkgs/srfi-doc/srfi/scribblings/util.rkt racket-6.12/share/pkgs/srfi-doc/srfi/scribblings/util.rkt
+--- racket-6.12-orig/share/pkgs/srfi-doc/srfi/scribblings/util.rkt	1969-12-31 19:00:00.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-doc/srfi/scribblings/util.rkt	2018-01-31 12:22:58.144502000 -0500
+@@ -0,0 +1,61 @@
++#lang scribble/doc
++
++@(require scribble/manual
++          scribble/eval
++          scriblib/render-cond
++          scribble/core
++          scribble/html-properties
++          (for-syntax scheme/base)
++          (for-label scheme/base
++                     racket/stream))
++
++@(provide (all-defined-out))
++
++@(define-syntax (srfi stx)
++  (syntax-case stx ()
++   [(_ num #:subdir subdir? . title)
++    (with-syntax ([srfi/n (string->symbol (format "srfi/~a" (syntax-e #'num)))])
++      #'(begin
++          (section #:tag (format "srfi-~a" num)
++                   #:style 'unnumbered
++                   (format "SRFI ~a: " num)
++                   . title)
++          (defmodule srfi/n)
++          "Original specification: "
++          (let* ([label (format "SRFI ~a" num)]
++                 [sub (if subdir? (format "srfi-~a/" num) "")]
++                 [url (λ (b) (format "~a/srfi-std/~asrfi-~a.html" b sub num))])
++            (cond-element
++              [(or latex text) @link[(url "http://docs.racket-lang.org") label]]
++              [else @link[(url ".") label]]))))]
++   [(_ num . title) #'(srfi num #:subdir #f . title)]))
++
++@;{ The `lst' argument is a list of
++       (list sym syntactic-form? html-anchor) }
++@(define (redirect n lst #:subdir [subdir? #f])
++   (let ([file (if subdir?
++                 (format "srfi-~a/srfi-~a.html" n n)
++                 (format "srfi-~a.html" n))]
++         [mod-path (string->symbol (format "srfi/~a" n))])
++     (make-binding-redirect-elements mod-path
++       (map (lambda (b)
++              (list (car b) (cadr b)
++                    (build-path "srfi-std" file)
++                    (caddr b)))
++            lst))))
++
++@(define in-core
++   (case-lambda
++     [() (in-core ".")]
++     [(k) @elem{This SRFI's bindings are also available in
++                @racketmodname[racket/base]@|k|}]))
++
++@(begin
++  (define-syntax-rule (def-mz mz-if)
++    (begin
++      (require (for-label mzscheme))
++      (define mz-if (racket if))))
++  (def-mz mz-if))
++
++@(define srfi-std (style #f (list (install-resource "srfi-std"))))
++
+diff -urN racket-6.12-orig/share/pkgs/srfi-doc-nonfree/info.rkt racket-6.12/share/pkgs/srfi-doc-nonfree/info.rkt
+--- racket-6.12-orig/share/pkgs/srfi-doc-nonfree/info.rkt	1969-12-31 19:00:00.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-doc-nonfree/info.rkt	2018-01-31 12:22:58.144502000 -0500
+@@ -0,0 +1,19 @@
++#lang info
++
++(define collection 'multi)
++
++(define build-deps '("mzscheme-doc"
++                     "scheme-lib"
++                     "base"
++                     "scribble-lib"
++                     "srfi-doc"
++                     "srfi-lib-nonfree"
++                     "racket-doc"
++                     "r5rs-doc"
++                     "r6rs-doc"
++                     "compatibility-lib"))
++(define update-implies '("srfi-lib-nonfree"))
++
++(define pkg-desc "documentation part of \"srfi nonfree\"")
++
++(define pkg-authors '(mflatt noel chongkai jay))
+diff -urN racket-6.12-orig/share/pkgs/srfi-doc-nonfree/srfi/scribblings/info.rkt racket-6.12/share/pkgs/srfi-doc-nonfree/srfi/scribblings/info.rkt
+--- racket-6.12-orig/share/pkgs/srfi-doc-nonfree/srfi/scribblings/info.rkt	1969-12-31 19:00:00.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-doc-nonfree/srfi/scribblings/info.rkt	2018-01-31 12:22:58.144502000 -0500
+@@ -0,0 +1,3 @@
++#lang info
++
++(define scribblings '(("srfi-nf.scrbl" (multi-page) (library 100))))
+diff -urN racket-6.12-orig/share/pkgs/srfi-doc-nonfree/srfi/scribblings/srfi-nf.scrbl racket-6.12/share/pkgs/srfi-doc-nonfree/srfi/scribblings/srfi-nf.scrbl
+--- racket-6.12-orig/share/pkgs/srfi-doc-nonfree/srfi/scribblings/srfi-nf.scrbl	1969-12-31 19:00:00.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-doc-nonfree/srfi/scribblings/srfi-nf.scrbl	2018-01-31 12:22:58.144502000 -0500
+@@ -0,0 +1,66 @@
++#lang scribble/doc
++@(require srfi/scribblings/util
++          scribble/manual
++          scribble/eval
++          scriblib/render-cond
++          scribble/core
++          scribble/html-properties
++          (for-syntax scheme/base)
++          (for-label scheme/base
++                     racket/stream))
++
++@; ----------------------------------------------------------------------
++
++@title{SRFI Nonfree Libraries and Documentation}
++
++The @link[#:style srfi-std "http://srfi.schemers.org/"]{Scheme Requests for
++Implementation} (a.k.a. @deftech{SRFI}) process allows individual
++members of the Scheme community to propose libraries and extensions to
++be supported by multiple Scheme implementations.
++
++Racket is distributed with implementations of many SRFIs, most of
++which can be implemented as libraries. To import the bindings of SRFI
++@math{n}, use
++
++@racketblock[
++(require @#,elem{@racketidfont{srfi/}@math{n}})
++]
++
++This document lists the SRFIs that are supported by Racket and
++provides a link to the original SRFI specification (which is also
++distributed as part of Racket's documentation).
++
++The following SRFI specification documents are licensed restrictively.  
++
++@table-of-contents[]
++
++
++@; ----------------------------------------
++
++@srfi[5]{A compatible let form with signatures and rest arguments}
++
++@redirect[5 '(
++ (let #t "unnamed")
++)]
++
++Racket provides this SRFI in the @racket[srfi-lib-nonfree] package.
++
++@; ----------------------------------------
++
++@srfi[29]{Localization}
++
++@redirect[29 '(
++ (current-language #f "current-language")
++ (current-country #f "current-country")
++ (current-locale-details #f "current-locale-details")
++ (declare-bundle! #f "declare-bundle!")
++ (store-bundle #f "store-bundle")
++ (load-bundle! #f "load-bundle!")
++ (localized-template #f "localized-template")
++)]
++
++Racket provides a free implementation of this SRFI in the @racket[srfi-lib] package.  Only the SRFI specification document is nonfree.
++
++@; ----------------------------------------
++
++@index-section[]
+diff -urN racket-6.12-orig/share/pkgs/srfi-doc-nonfree/srfi/scribblings/srfi-std/srfi-29.html racket-6.12/share/pkgs/srfi-doc-nonfree/srfi/scribblings/srfi-std/srfi-29.html
+--- racket-6.12-orig/share/pkgs/srfi-doc-nonfree/srfi/scribblings/srfi-std/srfi-29.html	1969-12-31 19:00:00.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-doc-nonfree/srfi/scribblings/srfi-std/srfi-29.html	2018-01-31 12:22:58.144502000 -0500
+@@ -0,0 +1,507 @@
++<!DOCTYPE html PUBLIC "-//IETF//DTD HTML//EN">
++<html>
++  <head>
++    <meta name="generator" content="HTML Tidy, see www.w3.org">
++    <title>SRFI 29: Localization</title>
++    <meta name="author" content="Scott G. Miller">
++    <meta name="description" content="Localization">
++  </head>
++  <body>
++    <H1>Title</H1>
++
++    SRFI 29: Localization 
++
++    <H1>Author</H1>
++
++    Scott G. Miller 
++
++    <H1>Abstract</H1>
++
++    This document specifies an interface to retrieving and
++    displaying locale sensitive messages. A Scheme program can
++    register one or more translations of templated messages, and
++    then write Scheme code that can transparently retrieve the
++    appropriate message for the locale under which the Scheme
++    system is running. <br>
++     
++
++    <H1>Rationale</H1>
++
++    <p>As any programmer that has ever had to deal with making his
++    or her code readable in more than one locale, the process of
++    sufficiently abstracting program messages from their
++    presentation to the user is non-trivial without help from the
++    programming language. Most modern programming language
++    libraries do provide some mechanism for performing this
++    separation.</p>
++
++    <p>A portable API that allows a piece of code to run without
++    modification in different countries and under different
++    languages is a must for any non-trivial software project.
++    &nbsp;The interface should separate the logic of a program from
++    the myriad of translations that may be necessary.</p>
++
++    <p>The interface described in this document provides such
++    functionality. The underlying implementation is also allowed to
++    use whatever datastructures it likes to provide access to the
++    translations in the most efficient manner possible. &nbsp;In
++    addition, the implementation is provided with standardized
++    functions that programs will use for accessing an external,
++    unspecified repository of translations.</p>
++
++    <p>This interface <i>does not</i> cover all aspects of
++    localization, including support for non-latin characters,
++    number and date formatting, etc. Such functionality is the
++    scope of a future SRFI that may extend this one.</p>
++
++    <H1>Dependencies</H1>
++
++    An SRFI-29 conformant implementation must also implement
++    SRFI-28, Basic Format Strings. Message templates are strings
++    that must be processed by the <tt>format</tt> function
++    specified in that SRFI. 
++
++    <H1>Specification</H1>
++
++    <h3>Message Bundles</h3>
++
++    <p>A Message Bundle is a set of message templates and their
++    identifying keys. Each bundle contains one or more such
++    key/value pairs. The bundle itself is associated with a
++    <i>bundle specifier</i> which uniquely identifies the
++    bundle.</p>
++
++    <h3>Bundle Specifiers</h3>
++
++    <p>A Bundle Specifier is a Scheme list that describes, in order
++    of importance, the package and locale of a message bundle.
++    &nbsp;In most cases, a locale specifier will have between one
++    and three elements. The first element is a symbol denoting the
++    package for which this bundle applies. The second and third
++    elements denote a <i>locale</i>. The second element (first
++    element of the locale) if present, is the two letter, ISO 639-1
++    language code for the bundle. The third element, if present, is
++    a two letter ISO 3166-1 country code. &nbsp;In some cases, a
++    fourth element may be present, specifying the encoding used for
++    the bundle. &nbsp;All bundle specifier elements are Scheme
++    symbols.</p>
++
++    <p>If only one translation is provided, it should be designated
++    only by a package name, for example <tt>(mathlib)</tt>. This
++    translation is called the <i>default</i> translation.</p>
++
++    <h3>Bundle Searching</h3>
++
++    <p>When a message template is retrieved from a bundle, the
++    Scheme implementation will provide the locale under which the
++    system is currently running. When the template is retrieved,
++    the package name will be specified. The Scheme system should
++    construct a Bundle Specifier from the provided package name and
++    the active locale. For example, when retrieving a message
++    template for French Canadian, in the <tt>mathlib</tt> package,
++    the bundle specifier '<tt>(mathlib fr ca)</tt>' is used. A
++    program may also retrieve the elements of the current locale
++    using the no-argument procedures:</p>
++
++    <p><b><a name="current-language"></a><tt>current-language</tt></b> <tt>-&gt;
++    <i>symbol</i></tt><br>
++     <tt><b>current-language</b> <i>symbol</i> -&gt;
++    undefined</tt><br>
++    </p>
++
++    <blockquote>
++      When given no arguments, returns the current ISO 639-1
++      language code as a symbol. &nbsp;If provided with an
++      argument, the current language is set to that named by the
++      symbol for the currently executing Scheme thread (or for the
++      entire Scheme system if such a distinction is not possible).
++      &nbsp;
++    </blockquote>
++
++    <p><b><a name="current-country"></a><tt>current-country</tt></b> <tt>-&gt;
++    <i>symbol</i></tt><br>
++     <tt><b>current-country</b> <i>symbol</i> -&gt;
++    undefined</tt><br>
++    </p>
++
++    <blockquote>
++      returns the current ISO 3166-1 country code as a symbol.
++      &nbsp;If provided with an argument, the current country is
++      set to that named by the symbol for the currently executing
++      Scheme thread (or for the entire Scheme system if such a
++      distinction is not possible). &nbsp;&nbsp;
++    </blockquote>
++
++    <p><b><a name="current-locale-details"></a><tt>current-locale-details</tt></b> <tt>-&gt; <i>list of
++    symbol</i></tt>s<br>
++     <tt><b>current-locale-details</b> <i>list-of-symbols</i> -&gt;
++    undefined</tt><br>
++    </p>
++
++    <blockquote>
++      Returns a list of additional locale details as a list of
++      symbols. &nbsp;This list may contain information about
++      encodings or other more specific information. &nbsp;If
++      provided with an argument, the current locale details are set
++      to those given in the currently executing Scheme thread (or
++      for the entire Scheme system if such a distinction is not
++      possible).&nbsp;
++    </blockquote>
++
++    <p>The Scheme System should first check for a bundle with the
++    exact name provided. If no such bundle is found, the last
++    element from the list is removed and a search is tried for a
++    bundle with that name. If no bundle is then found, the list is
++    shortened by removing the last element again. If no message is
++    found and the bundle specifier is now the empty list, an error
++    should be raised.</p>
++
++    <p>The reason for this search order is to provide the most
++    locale sensitive template possible, but to fall back on more
++    general templates if a translation has not yet been provided
++    for the given locale.</p>
++
++    <h3>Message Templates</h3>
++
++    <p>A message template is a localized message that may or may
++    not contain one of a number of formatting codes. A message
++    template is a Scheme string. The string is of a form that can
++    be processed by the <tt>format</tt> procedure found in many
++    Scheme systems and formally specified in SRFI-28 (Basic Format
++    Strings).</p>
++
++    <p>This SRFI also extends SRFI-28 to provide an additional
++    <tt>format</tt> escape code:</p>
++
++    <blockquote>
++      <tt>~[n]@*</tt> - Causes a value-requiring escape code that
++      follows this code immediately to reference the [N]'th
++      optional value absolutely, rather than the next unconsumed
++      value. The referenced value is <i>not</i> consumed.
++    </blockquote>
++    This extension allows optional values to be positionally
++    referenced, so that message templates can be constructed that
++    can produce the proper word ordering for a language. 
++
++    <h3>Preparing Bundles</h3>
++    Before a bundle may be used by the Scheme system to retrieve
++    localized template messages, they must be made available to the
++    Scheme system. &nbsp;This SRFI specifies a way to portably
++    define the bundles, as well as store them in and retrieve them
++    from an unspecified system which may be provided by resources
++    outside the Scheme system.<br>
++     
++
++    <p><b><a name="declare-bundle!"></a><tt>declare-bundle!</tt></b> <tt><i>bundle-specifier
++    association-list</i> -&gt; undefined<br>
++    </tt></p>
++
++    <blockquote>
++      Declares a new bundle named by the given bundle-specifier.
++      &nbsp;The contents of the bundle are defined by the provided
++      association list. &nbsp;The list contains associations
++      between Scheme symbols and the message templates (Scheme
++      strings) they name. &nbsp;If a bundle already exists with the
++      given name, it is overwritten with the newly declared
++      bundle.<br>
++    </blockquote>
++    <tt><a name="store-bundle"></a><b>store-bundle</b> <i>bundle-specifier</i> -&gt;
++    boolean</tt><br>
++     
++
++    <blockquote>
++      Attempts to store a bundle named by the given bundle
++      specifier, and previously made available using
++      <tt>declare-bundle!</tt> or <tt>load-bundle!</tt>, in an
++      unspecified mechanism that may be persistent across Scheme
++      system restarts. &nbsp;If successful, a non-false value is
++      returned. &nbsp;If unsuccessful, <tt>#f</tt> is returned.<br>
++    </blockquote>
++    <tt><a name="load-bundle!"></a><b>load-bundle!</b> <i>bundle-specifier</i> -&gt;
++    boolean</tt><br>
++     
++
++    <blockquote>
++      Attempts to retrieve a bundle from an unspecified mechanism
++      which stores bundles outside the Scheme system. &nbsp;If the
++      bundle was retrieved successfully, the function returns a
++      non-false value, and the bundle is immediately available to
++      the Scheme system. If the bundle could not be found or loaded
++      successfully, the function returns <tt>#f</tt>, and the
++      Scheme system's bundle registry remains unaffected.<br>
++    </blockquote>
++    A compliant Scheme system may choose not to provide any
++    external mechanism to store localized bundles. &nbsp;If it does
++    not, it must still provide implementations for
++    <tt>store-bundle</tt> and <tt>load-bundle!</tt>. In such a
++    case, both functions must return <tt>#f</tt> regardless of the
++    arguments given. Users of this SRFI should recognize that the
++    inability to load or store a localized bundle in an external
++    repository is <i>not</i> a fatal error.<br>
++     
++
++    <h3>Retrieving Localized Message Templates</h3>
++
++    <p><a name="localized-template"></a><b><tt>localized-template</tt></b> <i><tt>package-name
++    message-template-name</tt></i> <tt>-&gt; <i>string or #f<br>
++    </i></tt></p>
++
++    <blockquote>
++      Retrieves a localized message template for the given package
++      name and the given message template name (both symbols).
++      &nbsp;If no such message could be found, false (#f) is
++      returned.<br>
++      <br>
++    </blockquote>
++    After retrieving a template, the calling program can use
++    <tt>format</tt> to produce a string that can be displayed to
++    the user.<br>
++     
++
++    <h2>Examples</h2>
++    The below example makes use of SRFI-29 to display simple,
++    localized messages. &nbsp;It also defines its bundles in such a
++    way that the Scheme system may store and retrieve the bundles
++    from a more efficient system catalog, if available.<br>
++     
++<pre>
++(let ((translations
++       '(((en) . ((time . "Its ~a, ~a.")
++                (goodbye . "Goodbye, ~a.")))
++         ((fr) . ((time . "~1@*~a, c'est ~a.")
++                (goodbye . "Au revoir, ~a."))))))
++  (for-each (lambda (translation)
++              (let ((bundle-name (cons 'hello-program (car translation))))
++                (if (not (load-bundle! bundle-name))
++                    (begin
++                     (declare-bundle! bundle-name (cdr translation))
++                     (store-bundle! bundle-name)))))
++             translations))
++
++(define localized-message
++  (lambda (message-name . args)
++    (apply format (cons (localized-template 'hello-program
++                                            message-name)
++                        args))))
++
++(let ((myname "Fred"))
++  (display (localized-message 'time "12:00" myname))
++  (display #\newline)
++
++  (display (localized-message 'goodbye myname))
++  (display #\newline))
++
++;; Displays (English):
++;; Its 12:00, Fred.
++;; Goodbye, Fred.
++;;
++;; French:
++;; Fred, c'est 12:00.
++;; Au revoir, Fred.
++</pre>
++
++    <H1>Implementation</H1>
++
++    <p>The implementation requires that the Scheme system provide a
++    definition for <tt>current-language</tt> and
++    <tt>current-country</tt> capable of distinguishing the correct
++    locale present during a Scheme session. The definitions of
++    those functions in the reference implementation are not capable
++    of that distinction. Their implementation is provided only so
++    that the following code can run in any R4RS scheme system.
++    &nbsp;<br>
++    </p>
++
++    <p>In addition, the below implementation of a compliant
++    <tt>format</tt> requires SRFI-6 (Basic String Ports) and
++    SRFI-23 (Error reporting)</p>
++<pre>
++;; The association list in which bundles will be stored
++(define *localization-bundles* '())
++
++;; The current-language and current-country functions provided
++;; here must be rewritten for each Scheme system to default to the
++;; actual locale of the session
++(define current-language
++  (let ((current-language-value 'en))
++    (lambda args
++      (if (null? args)
++          current-language-value
++          (set! current-language-value (car args))))))
++
++(define current-country
++  (let ((current-country-value 'us))
++    (lambda args
++      (if (null? args)
++          current-country-value
++          (set! current-country-value (car args))))))
++
++;; The load-bundle! and store-bundle! both return #f in this
++;; reference implementation.  A compliant implementation need
++;; not rewrite these procedures.
++(define load-bundle!
++  (lambda (bundle-specifier)
++    #f))
++
++(define store-bundle!
++  (lambda (bundle-specifier)
++    #f))
++
++;; Declare a bundle of templates with a given bundle specifier
++(define declare-bundle!
++  (letrec ((remove-old-bundle
++            (lambda (specifier bundle)
++              (cond ((null? bundle) '())
++                    ((equal? (caar bundle) specifier)
++                     (cdr bundle))
++                    (else (cons (car bundle)
++                                (remove-old-bundle specifier
++                                                   (cdr bundle))))))))
++    (lambda (bundle-specifier bundle-assoc-list)
++      (set! *localization-bundles*
++            (cons (cons bundle-specifier bundle-assoc-list)
++                  (remove-old-bundle bundle-specifier
++                                     *localization-bundles*))))))
++
++;;Retrieve a localized template given its package name and a template name
++(define localized-template
++  (letrec ((rdc
++            (lambda (ls)
++              (if (null? (cdr ls))
++                  '()
++                  (cons (car ls) (rdc (cdr ls))))))
++           (find-bundle
++            (lambda (specifier template-name)
++              (cond ((assoc specifier *localization-bundles*) =&gt;
++                     (lambda (bundle) bundle))
++                    ((null? specifier) #f)
++                    (else (find-bundle (rdc specifier)
++                                       template-name))))))
++    (lambda (package-name template-name)
++      (let loop ((specifier (cons package-name
++                                  (list (current-language)
++                                        (current-country)))))
++        (and (not (null? specifier))
++             (let ((bundle (find-bundle specifier template-name)))
++               (and bundle
++                    (cond ((assq template-name bundle) =&gt; cdr)
++                          ((null? (cdr specifier)) #f)
++                          (else (loop (rdc specifier)))))))))))
++
++;;An SRFI-28 and SRFI-29 compliant version of format.  It requires
++;;SRFI-23 for error reporting.
++(define format
++  (lambda (format-string . objects)
++    (let ((buffer (open-output-string)))
++      (let loop ((format-list (string-&gt;list format-string))
++                 (objects objects)
++                 (object-override #f))
++        (cond ((null? format-list) (get-output-string buffer))
++              ((char=? (car format-list) #\~)
++               (cond ((null? (cdr format-list))
++                      (error 'format "Incomplete escape sequence"))
++                     ((char-numeric? (cadr format-list))
++                      (let posloop ((fl (cddr format-list))
++                                    (pos (string-&gt;number
++                                          (string (cadr format-list)))))
++                        (cond ((null? fl)
++                               (error 'format "Incomplete escape sequence"))
++                              ((and (eq? (car fl) '#\@)
++                                    (null? (cdr fl)))
++                                    (error 'format "Incomplete escape sequence"))
++                              ((and (eq? (car fl) '#\@)
++                                    (eq? (cadr fl) '#\*))
++                               (loop (cddr fl) objects (list-ref objects pos)))
++                              (else
++                                (posloop (cdr fl)
++                                         (+ (* 10 pos)
++                                            (string-&gt;number
++                                             (string (car fl)))))))))
++                     (else
++                       (case (cadr format-list)
++                         ((#\a)
++                          (cond (object-override
++                                 (begin
++                                   (display object-override buffer)
++                                   (loop (cddr format-list) objects #f)))
++                                ((null? objects)
++                                 (error 'format "No value for escape sequence"))
++                                (else
++                                  (begin
++                                    (display (car objects) buffer)
++                                    (loop (cddr format-list)
++                                          (cdr objects) #f)))))
++                         ((#\s)
++                          (cond (object-override
++                                 (begin
++                                   (display object-override buffer)
++                                   (loop (cddr format-list) objects #f)))
++                                ((null? objects)
++                                 (error 'format "No value for escape sequence"))
++                                (else
++                                  (begin
++                                    (write (car objects) buffer)
++                                    (loop (cddr format-list)
++                                          (cdr objects) #f)))))
++                         ((#\%)
++                          (if object-override
++                              (error 'format "Escape sequence following positional override does not require a value"))
++                          (display #\newline buffer)
++                          (loop (cddr format-list) objects #f))
++                        ((#\~)
++                          (if object-override
++                              (error 'format "Escape sequence following positional override does not require a value"))
++                          (display #\~ buffer)
++                          (loop (cddr format-list) objects #f))
++                         (else
++                           (error 'format "Unrecognized escape sequence"))))))
++              (else (display (car format-list) buffer)
++                    (loop (cdr format-list) objects #f)))))))
++
++</pre>
++
++    <H1>Copyright</H1>
++
++    Copyright (C) Scott G. Miller (2002). All Rights Reserved. 
++
++    <p>This document and translations of it may be copied and
++    furnished to others, and derivative works that comment on or
++    otherwise explain it or assist in its implementation may be
++    prepared, copied, published and distributed, in whole or in
++    part, without restriction of any kind, provided that the above
++    copyright notice and this paragraph are included on all such
++    copies and derivative works. However, this document itself may
++    not be modified in any way, such as by removing the copyright
++    notice or references to the Scheme Request For Implementation
++    process or editors, except as needed for the purpose of
++    developing SRFIs in which case the procedures for copyrights
++    defined in the SRFI process must be followed, or as required to
++    translate it into languages other than English.</p>
++
++    <p>The limited permissions granted above are perpetual and will
++    not be revoked by the authors or their successors or
++    assigns.</p>
++
++    <p>This document and the information contained herein is
++    provided on an "AS IS" basis and THE AUTHOR AND THE SRFI
++    EDITORS DISCLAIM ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING
++    BUT NOT LIMITED TO ANY WARRANTY THAT THE USE OF THE INFORMATION
++    HEREIN WILL NOT INFRINGE ANY RIGHTS OR ANY IMPLIED WARRANTIES
++    OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.</p>
++    <hr>
++
++    <address>
++      Editor: <a href="mailto:srfi-editors@srfi.schemers.org">David
++      Rush</a>
++    </address>
++
++    <address>
++      Author: <a href="mailto:scgmille@freenetproject.org">Scott G.
++      Miller</a>
++    </address>
++    <!-- Created: Tue Sep 29 19:20:08 EDT 1998 -->
++    <!-- hhmts start -->Last modified: Mon Jun 17 12:00:08 Pacific
++    Daylight Time 2002 <!-- hhmts end --> <br>
++  </body>
++</html>
++
+diff -urN racket-6.12-orig/share/pkgs/srfi-doc-nonfree/srfi/scribblings/srfi-std/srfi-5.html racket-6.12/share/pkgs/srfi-doc-nonfree/srfi/scribblings/srfi-std/srfi-5.html
+--- racket-6.12-orig/share/pkgs/srfi-doc-nonfree/srfi/scribblings/srfi-std/srfi-5.html	1969-12-31 19:00:00.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-doc-nonfree/srfi/scribblings/srfi-std/srfi-5.html	2018-01-31 12:22:58.144502000 -0500
+@@ -0,0 +1,345 @@
++<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 3.2//EN">
++<html>
++<head>
++   <title>SRFI 5: A compatible let form with signatures and rest arguments</title>
++</head>
++<body>
++
++<H1>Title</H1>
++
++SRFI-5: A compatible <code>let</code> form with signatures and rest arguments
++
++<H1>Author</H1>
++
++Andy Gaynor
++
++<H1>Status</H1>
++
++This SRFI is currently in ``final'' status.  To see an explanation of each status that a SRFI can hold, see <A HREF="http://srfi.schemers.org/srfi-process.html">here</A>.
++You can access the discussion on this SRFI via <A HREF="http://srfi.schemers.org/srfi-5/mail-archive/maillist.html">the archive of the mailing list</A>.
++<P><UL>
++<LI>Received: 1999/2/2
++<LI>Draft: 1999/2/10-1999/04/12
++<LI>Final: 1999/4/26
++<LI>Revised reference implementation: 2003/01/27
++</UL>
++
++<H1>Abstract</H1>
++
++The <i>named-let</i> incarnation of the <code>let</code> form has two slight
++inconsistencies with the <code>define</code> form.  As defined, the <code>let</code>
++form makes no accommodation for rest arguments, an issue of functionality
++and consistency.  As defined, the <code>let</code> form does not accommodate
++signature-style syntax, an issue of aesthetics and consistency.  Both
++issues are addressed here in a manner which is compatible with the traditional
++<code>let</code> form but for minor extensions.
++
++<H1>Rationale</H1>
++
++<H2>Signature-style Syntax</H2>
++
++Consider the following two equivalent definitions:
++
++<p><pre>
++(define fibonacci
++  (lambda (n i f0 f1)
++    (if (= i n)
++      f0
++      (fibonacci n (+ i 1) f1 (+ f0 f1)))))
++
++(define (fibonacci n i f0 f1)
++  (if (= i n)
++    f0
++    (fibonacci n (+ i 1) f1 (+ f0 f1))))
++</pre>
++
++Although there is a named-let analog for the former form, there is none
++for the latter.  To wit, suppose one wished to compute the 10th element
++of the Fibonacci sequence using a named let:
++
++<p>
++<pre>
++(let fibonacci ((n 10) (i 0) (f0 0) (f1 1))
++  (if (= i n)
++    f0
++    (fibonacci n (+ i 1) f1 (+ f0 f1))))
++Values: 55
++</pre>
++
++As it stands, one cannot equivalently write
++
++<p>
++<pre>
++(let (fibonacci (n 10) (i 0) (f0 0) (f1 1))
++  (if (= i n)
++    f0
++    (fibonacci n (+ i 1) f1 (+ f0 f1))))
++</pre>
++
++which is consistent with <code>define</code>'s signature-style form.
++<p>Those that favor the signature style may prefer this extension. 
++In any case, it may be more appropriate to include all bound names within
++the binding section.  As presented, this straightforward extension
++introduces no ambiguity or incompatibility with the existing definition
++of let.
++
++<H2>Rest Arguments</H2>
++
++As it stands, one cannot write a named let with rest arguments, as in
++
++<p>
++<pre>
++(let (blast (port (current-output-port)) . (x (+ 1 2) 4 5))
++  (if (null? x)
++    'just-a-silly-contrived-example
++    (begin
++      (write (car x) port)
++      (apply blast port (cdr x)))))
++</pre>
++
++otherwise equivalent to
++
++<p>
++<pre>
++(letrec ((blast (lambda (port . x)
++		  (if (null? x)
++		      'just-a-silly-contrived-example
++		      (begin
++			(write (car x) port)
++			(apply blast port (cdr x)))))))
++  (blast (current-output-port) (+ 1 2) 4 5))
++</pre>
++
++While this example is rather contrived, the functionality is not. 
++There are several times when the author has used this construct in practice. 
++Regardless, there is little reason to deny the <code>let</code> form access to
++all the features of lambda functionality.
++
++<H2>Symbols in Binding Sections</H2>
++
++Both the features above rely upon the placement of symbols in <code>let</code>
++binding lists (this statement is intentially simplistic).  The only
++other apparent use of such symbol placement is to tersely bind variables
++to unspecified values.  For example, one might desire to use
++<code>(let (foo bar baz) ...)</code>
++to bind <code>foo</code>, <code>bar</code>, and <code>baz</code> to
++unspecified values.
++
++<p>This usage is considered less important in light of the rationales
++presented above, and an alternate syntax is immediately apparent, as
++in <code>(let ((foo) (bar) (baz)) ...)</code> This may even
++be preferable, consistently parenthesizing normal binding clauses.
++
++<H1>Specification</H1>
++
++<H2>Syntax</H2>
++
++<p>
++A formal specification of the syntax follows.  Below, body, expression,
++and identifier are free.  Each instantiation of binding-name must be
++unique.
++</p>
++
++<p>
++<pre>
++            let = "(" "let" let-bindings body ")"
++    expressions = nothing | expression expressions
++   let-bindings = let-name bindings
++                | "(" let-name "." bindings ")"
++       let-name = identifier
++       bindings = "(" ")"
++                | rest-binding
++                | "(" normal-bindings ["." rest-binding] ")"
++normal-bindings = nothing
++                | normal-binding normal-bindings
++ normal-binding = "(" binding-name expression ")"
++   binding-name = identifier
++   rest-binding = "(" binding-name expressions ")"
++</pre>
++
++<p>
++For clarity and convenience, an informal specification follows.
++</p>
++
++<ol>
++<li><a name="unnamed">Unnamed</a>
++
++<p><pre>
++(let ((&lt;parameter&gt; &lt;argument&gt;)...) 
++  &lt;body&gt;...)
++</pre>
++</li>
++
++<li><a name="named-non-sig">
++Named, non-signature-style, no rest argument</a>
++
++<p><pre>
++(let &lt;name&gt; ((&lt;parameter&gt; &lt;argument&gt;)...)
++  &lt;body&gt;...)
++</pre>
++</li>
++
++<li><a name="named-sig">Named, signature-style,  no rest argument</a>
++
++<p><pre>
++(let (&lt;name&gt; (&lt;parameter&gt; &lt;argument&gt;)...)
++  &lt;body&gt;...)
++</pre>
++</li>
++
++<li><a name="named-non-sig-rest">Named, non-signature-style, rest argument</a>
++
++<p><pre>
++(let &lt;name&gt; ((&lt;parameter&gt; &lt;argument&gt;)...
++    
++. (&lt;rest-parameter&gt; &lt;rest-argument&gt;...))
++  &lt;body&gt;...)
++</pre>
++
++<li><a name="named-sig-rest">Named, signature-style, rest argument</a>
++
++<p><pre>
++(let (&lt;name&gt; (&lt;parameter&gt; &lt;argument&gt;)...
++   
++. (&lt;rest-parameter&gt; &lt;rest-argument&gt;...))
++  &lt;body&gt;...)
++</pre>
++</li>
++</ol>
++
++<H2>Semantics</H2>
++
++Let <code>$lambda</code> and <code>$letrec</code> be hygienic bindings for the <code>lambda</code>
++and <code>letrec</code> forms, respectively.
++
++<ul>
++<li>For informal syntax 1:
++
++<p><pre>
++(($lambda (&lt;parameter&gt;...) &lt;body&gt;...) &lt;argument&gt;...)
++</pre>
++</li>
++
++<li>For informal syntaxes 2 and 3:
++
++<p>
++<pre>
++($letrec ((&lt;name&gt; ($lambda (&lt;parameter&gt;...) &lt;body&gt;...)))
++  (&lt;name&gt; &lt;argument&gt;...))
++</pre>
++</li>
++
++<li>For informal syntaxes 4 and 5:
++
++<p>
++<pre>
++($letrec ((&lt;name&gt; ($lambda (&lt;parameter&gt;...
++   
++. &lt;rest-parameter&gt;) &lt;body&gt;...))) 
++  (&lt;name&gt; &lt;argument&gt;... &lt;rest-argument&gt;...))
++</pre>
++</li>
++</ul>
++
++<H1>Implementation</H1>
++
++Here is an implementation using <code>SYNTAX-RULES</code>.
++
++<p>
++<pre>
++;; Use your own standard let.
++;; Or call a lambda.
++;; (define-syntax standard-let
++;;
++;;   (syntax-rules ()
++;;
++;;     ((let ((var val) ...) body ...)
++;;      ((lambda (var ...) body ...) val ...))))
++
++(define-syntax let
++
++  (syntax-rules ()
++
++    ;; No bindings: use standard-let.
++    ((let () body ...)
++     (standard-let () body ...))
++    ;; Or call a lambda.
++    ;; ((lambda () body ...))
++
++    ;; All standard bindings: use standard-let.
++    ((let ((var val) ...) body ...)
++     (standard-let ((var val) ...) body ...))
++    ;; Or call a lambda.
++    ;; ((lambda (var ...) body ...) val ...)
++
++    ;; One standard binding: loop.
++    ;; The all-standard-bindings clause didn't match,
++    ;; so there must be a rest binding.
++    ((let ((var val) . bindings) body ...)
++     (let-loop #f bindings (var) (val) (body ...)))
++
++    ;; Signature-style name: loop.
++    ((let (name binding ...) body ...)
++     (let-loop name (binding ...) () () (body ...)))
++
++    ;; defun-style name: loop.
++    ((let name bindings body ...)
++     (let-loop name bindings () () (body ...)))))
++
++(define-syntax let-loop
++
++  (syntax-rules ()
++
++    ;; Standard binding: destructure and loop.
++    ((let-loop name ((var0 val0) binding ...) (var ...     ) (val ...     ) body)
++     (let-loop name (            binding ...) (var ... var0) (val ... val0) body))
++
++    ;; Rest binding, no name: use standard-let, listing the rest values.
++    ;; Because of let's first clause, there is no "no bindings, no name" clause.
++    ((let-loop #f (rest-var rest-val ...) (var ...) (val ...) body)
++     (standard-let ((var val) ... (rest-var (list rest-val ...))) . body))
++    ;; Or call a lambda with a rest parameter on all values.
++    ;; ((lambda (var ... . rest-var) . body) val ... rest-val ...))
++    ;; Or use one of several other reasonable alternatives.
++
++    ;; No bindings, name: call a letrec'ed lambda.
++    ((let-loop name () (var ...) (val ...) body)
++     ((letrec ((name (lambda (var ...) . body)))
++        name)
++      val ...))
++
++    ;; Rest binding, name: call a letrec'ed lambda.
++    ((let-loop name (rest-var rest-val ...) (var ...) (val ...) body)
++     ((letrec ((name (lambda (var ... . rest-var) . body)))
++        name)
++      val ... rest-val ...))))
++</pre>
++
++
++<H1>Copyright</H1>
++
++Copyright (C) Andy Gaynor (1999). All Rights Reserved.
++<p>This document and translations of it may be copied and furnished to
++others, and derivative works that comment on or otherwise explain it or
++assist in its implementation may be prepared, copied, published and distributed,
++in whole or in part, without restriction of any kind, provided that the
++above copyright notice and this paragraph are included on all such copies
++and derivative works. However, this document itself may not be modified
++in any way, such as by removing the copyright notice or references to the
++Scheme Request For Implementation process or editors, except as needed
++for the purpose of developing SRFIs in which case the procedures for copyrights
++defined in the SRFI process must be followed, or as required to translate
++it into languages other than English.
++<p>The limited permissions granted above are perpetual and will not be
++revoked by the authors or their successors or assigns.
++<p>This document and the information contained herein is provided on an
++"AS IS" basis and THE AUTHOR AND THE SRFI EDITORS DISCLAIM ALL WARRANTIES,
++EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTY THAT THE
++USE OF THE INFORMATION HEREIN WILL NOT INFRINGE ANY RIGHTS OR ANY IMPLIED
++WARRANTIES OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
++
++    <hr>
++    <address>Editor: <a href="mailto:srfi-editors@srfi.schemers.org">Mike Sperber</a></address>
++
++</body>
++</html>
+diff -urN racket-6.12-orig/share/pkgs/srfi-lib/info.rkt racket-6.12/share/pkgs/srfi-lib/info.rkt
+--- racket-6.12-orig/share/pkgs/srfi-lib/info.rkt	2018-01-26 16:10:02.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-lib/info.rkt	2018-01-31 12:22:58.144502000 -0500
+@@ -1 +1,15 @@
+-(module info setup/infotab (#%module-begin (define package-content-state (quote (built "6.12"))) (define collection (quote multi)) (define deps (quote ("scheme-lib" "base" "srfi-lite-lib" "r6rs-lib" "compatibility-lib"))) (define implies (quote ("srfi-lite-lib"))) (define pkg-desc "implementation (no documentation) part of \"srfi\"") (define pkg-authors (quote (mflatt noel chongkai jay)))))
++#lang info
++
++(define collection 'multi)
++
++(define deps '("scheme-lib"
++               "base"
++               "srfi-lite-lib"
++               "r6rs-lib"
++               "compatibility-lib"))
++
++(define implies '("srfi-lite-lib"))
++
++(define pkg-desc "implementation (no documentation) part of \"srfi\"")
++
++(define pkg-authors '(mflatt noel chongkai jay))
+diff -urN racket-6.12-orig/share/pkgs/srfi-lib/srfi/32/sort.txt racket-6.12/share/pkgs/srfi-lib/srfi/32/sort.txt
+--- racket-6.12-orig/share/pkgs/srfi-lib/srfi/32/sort.txt	2018-01-26 15:34:52.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-lib/srfi/32/sort.txt	1969-12-31 19:00:00.000000000 -0500
+@@ -1,1069 +0,0 @@
+-The SRFI-32 sort libraries					-*- outline -*-
+-Olin Shivers
+-First draft: 1998/10/19
+-Last update: 2002/7/21
+-
+-[Todo: del-list-neighbor-dups!
+-       vector-copy -> subvector
+-       use srfi-23 for reporting errors
+-       use srfi-16 for n-aries?
+-
+-Emacs should display this document in outline mode. Say c-h m for
+-instructions on how to move through it by sections (e.g., c-c c-n, c-c c-p).
+-
+-* Table of contents
+--------------------
+-Abstract
+-Procedure index
+-Introduction
+-What's wrong with the current state of affairs?
+-Design rules
+-  What vs. how
+-  Consistency across function signatures
+-  Data parameter first, less-than parameter after
+-  Ordering, comparison functions & stability
+-  All vector operations accept optional subrange parameters
+-  Required vs. allowed side-effects
+-Procedure specification
+-  Procedure naming and functionality
+-  Types of parameters and return values
+-  sort-lib - general sorting package
+-  Algorithm-specific sorting packages
+-Algorithmic properties
+-Topics to be resolved during discussion phase
+-Porting and optimisation
+-References & Links
+-Acknowledgements
+-Copyright
+-
+-
+-* Abstract
+-----------
+-Current Scheme sorting packages are, every one of them, surprisingly bad. I've
+-designed the API for a full-featured sort toolkit, which I propose as a SRFI.
+-
+-The spec comes with 1200 lines of high-quality reference code: tightly
+-written, highly commented, portable code, available for free. Implementors
+-want this code. It's better than what you have.
+-
+--------------------------------------------------------------------------------
+-* Procedure index
+------------------
+-list-sorted?			vector-sorted?
+-
+-list-merge			vector-merge
+-list-sort			vector-sort
+-list-stable-sort		vector-stable-sort
+-list-delete-neighbor-dups	vector-delete-neighbor-dups
+-
+-list-merge!			vector-merge!
+-list-sort!			vector-sort!
+-list-stable-sort!		vector-stable-sort!
+-list-delete-neighbor-dups!	vector-delete-neighbor-dups!
+-
+-quick-sort    heap-sort   insert-sort   list-merge-sort   vector-merge-sort
+-quick-sort!   heap-sort!  insert-sort!  list-merge-sort!  vector-merge-sort!
+-quick-sort3!             
+-
+-vector-binary-search
+-vector-binary-search3
+-
+--------------------------------------------------------------------------------
+-* Introduction
+---------------
+-As I'll detail below, I wasn't very happy with the state of the Scheme
+-world for sorting and merging lists and vectors. So I have designed and 
+-written a fairly comprehensive sorting & merging toolkit. It is
+-
+-    - very portable,
+-
+-    - much better code than what is currently in Elk, Gambit, Bigloo, 
+-      Scheme->C, MzScheme, RScheme, Scheme48, MIT Scheme, or slib, and 
+-
+-    - priced to move: free code.
+-
+-The package includes
+-    - Vector insert sort (stable)
+-    - Vector heap sort
+-    - Vector quick sort (with median-of-3 pivot picking)
+-    - Vector merge sort (stable)
+-    - Pure and destructive list merge sort (stable)
+-    - Stable vector and list merge
+-    - Miscellaneous sort-related procedures: Vector and list merging, 
+-      sorted? predicates, vector binary search, vector and list 
+-      delete-equal-neighbor procedures.
+-    - A general, non-algorithmic set of procedure names for general sorting
+-      and merging.
+-
+-Scheme programmers may want to adopt this package. I'd like Scheme
+-implementors to adopt this code and its API -- in fact, the code is a bribe to
+-make it easy for implementors to converge on the suggested API. I mean, you'd
+-really have to be a boor to take this free code I wrote and mutate its
+-interface over to your incompatible, unportable API, wouldn't you? But you
+-could, of course -- it's freely available. More in the spirit of the offering,
+-you could make this API available, and then also write a little module
+-providing your old interface that is defined in terms of this API. "Scheme
+-implementors," in this context, includes slib, which is not a standalone
+-implementation of Scheme, but rather an influential collection of API's and
+-code.
+-
+-The code is tightly bummed. It is clearly written, and commented in my usual
+-voluminous style. This includes notes on porting and implementation-specific
+-optimisations.
+-
+-
+--------------------------------------------------------------------------------
+-* What's wrong with the current state of affairs?
+--------------------------------------------------
+-
+-It's just amazing to me that in 2002, sorting and merging hasn't been
+-completely put to bed. These are well-understood algorithms, each of them well
+-under a page of code. The straightforward algorithms are basic, core stuff --
+-sophomore-level. But if you tour the major Scheme implementations out there on
+-the Net, you find badly written code that provides extremely spotty coverage
+-of the algorithm space. One implementation even has a buggy implementation
+-that has been in use for about 20 years. Another has an O(n^2) algorithm...
+-implemented in C for speed.
+-
+-Open source-code is a wonderful thing. In a couple of hours, I was able to
+-download and check the sources of 9 Scheme systems. Here are my notes from the
+-systems I checked. You can skip to the next section if you aren't morbidly
+-curious.
+-
+-slib
+-  sorted? vector-or-list <
+-  merge  list1 list2 <
+-  merge! list1 list2 <
+-  sort  vector-or-list <
+-  sort! vector-or-list <
+-
+-  Richard O'Keefe's stable list merge sort is right idea, but implemented 
+-  using gratuitous variable side effects. It also does redundant SET-CDR!s.
+-  The vector sort converts to list, merge sorts, then reconverts
+-  to vector. This is a bad idea -- non-local pointer chasing bad; vector 
+-  shuffling good. If you must allocate temp storage, might as well allocate
+-  a temp vector and use vector merge sort.
+-
+-MIT Scheme
+-  sort!       vector <
+-  merge-sort! vector <
+-  quick-sort! vector <
+-
+-  sort       vector-or-list <
+-  merge-sort vector-or-list <
+-  quick-sort vector-or-list <
+-
+-  Naive vector quicksort: loser, for worst-case performance reasons.
+-  List sort by "list->vector; quicksort; vector->list," hence also loser.
+-  A clever stable vector merge sort, albeit not very bummed.
+-
+-Scheme 48 & T
+-  sort-list  list <
+-  sort-list! list <
+-  list-merge! list1 list2 <
+-
+-  Bob Nix's implementation of online merge-sort, written in the early 80's. 
+-  Conses unnecessary bookkeeping structure, which isn't necessary with a
+-  proper recursive formulation. Also, does redundant SET-CDR!s. No vector
+-  sort. Also, has a bug -- is claimed to be a stable sort, but isn't! To see
+-  this, get the S48 code, and try
+-    (define (my< x y) (< (abs x) (abs y)))
+-    (list-merge! (list 0 2) (list   -2) my<)		; -> (0  2 -2)
+-    (list-merge! (list   2) (list 0 -2) my<)		; -> (0 -2  2)
+-  This could be fixed very easily, but it isn't worth it given the 
+-  other problems with the algorithm.
+-
+-RScheme
+-  vector-sort! vector <
+-  sort collection <
+-
+-  Good basic implementation of vector heapsort, which has O(n lg n)
+-  worst-case time. Code ugly, needs tuning. List sort by "list->vector; 
+-  sort; vector->list." Nothing for stable sorting.
+-
+-MzScheme
+-  quicksort lis <
+-  mergesort alox <
+-
+-  Sorts lists with (list->vector; quicksort; vector->list) -- but the core
+-  quicksort is not available for vector sorting. Nothing for stable sorting.
+-  Quicksort picks pivot naively, inducing O(n^2) worse-case behaviour on a
+-  fairly common case: an already-sorted list.
+-
+-Bigloo, STK
+-  sort vector-or-list <
+-  Uses an O(n^2) algorithm... implemented in C for speed. Hmm.
+-  (See runtime/Ieee/vector.scm and runtime/Clib/cvector.c)
+-
+-Gambit
+-  sort-list list <
+-  Nothing for vectors. Simple, slow, unstable merge sort for lists.
+-
+-Elk
+-  Another naive quicksort. Lists handled by converting to vector.
+-  sort  vector-or-list <
+-  sort! vector-or-list <
+-
+-Chez Scheme
+-  merge  < list1 list2
+-  merge! < list1 list2
+-  sort  < list
+-  sort! < list
+-
+-  These are stable. I have not seen the source code.
+-
+-Common Lisp
+-  sort        sequence < [key]
+-  stable-sort sequence < [key]
+-  merge result-type sequence1 sequence2 < [key]
+-
+-  The sort procedures are allowed, but not required, to be destructive.
+-
+-SML/NJ
+-  sort: ('a*'a -> bool) -> 'a list -> 'a list
+-  "Smooth applicative merge sort," which is stable.
+-  There is also a highly bummed quicksort for vectors.
+-
+-The right solution: Implement a full toolbox of carefully written standard sort
+-routines.
+-
+-Having the source of all these above-cited Schemes available for study made
+-life a lot easier writing this code. I appreciate the authors making their
+-source available under such open terms.
+-
+-
+--------------------------------------------------------------------------------
+-* Design rules
+---------------
+-
+-** What vs. how
+-===============
+-There are two different interfaces: "what" (simple) & "how" (detailed).
+-
+-    - Simple: you specify semantics: datatype (list or vector), 
+-      mutability, and stability.
+-
+-    - Detailed: you specify the actual algorithm (quick, heap,
+-      insert, merge). Different algorithms have different properties,
+-      both semantic & pragmatic, so these exports are necessary.
+-
+-      It is necessarily the case that the specifications of these procedures
+-      make statements about execution "pragmatics." For example, the sole
+-      distinction between heap sort and quick sort -- both of which are
+-      provided by this library -- is one of execution time, which is not a
+-      "semantic" distinction. Similar resource-use statements are made about
+-      "iterative" procedures, meaning that they can execute on input of
+-      arbitrary size in a constant number of stack frames.
+-
+-** Consistency across function signatures
+-=========================================
+-The two interfaces share common function signatures wherever
+-possible, to facilitate switching a given call from one procedure
+-to another.
+-	
+-** Less-than parameter first, data parameter after
+-==================================================
+-These procedures uniformly observe the following parameter order:
+-the data to be sorted comes after the comparison function.
+-That is, we write
+-  (sort < lis)
+-not
+-  (sort lis <).
+-
+-With the sole exception of Chez Scheme, this is the exact opposite of
+-every sort function out there in current use in the Scheme world. (See
+-the summary of related APIs above.) However, it is consistent with common
+-practice across Scheme libraries in general to put the ordering function
+-first -- the "operation currying" convention. (E.g., consider FOR-EACH or
+-MAP or FIND.) 
+-
+-The original draft of this SRFI used the data-first/comparison-last convention
+-for backwards compatibility -- a decision I made with internal misgivings.
+-Happily, however, the overwhelming response from the discussion phase
+-supported "cleaning up" this issue and re-converging the parameter order with
+-the general Scheme "op currying" convention. So the original decision was
+-inverted in favor of the comparison-first/data-last convention.
+-
+-** Ordering, comparison functions & stability
+-=============================================
+-These routines take a < comparison function, not a <= comparison
+-function, and they sort into increasing order. The difference between
+-a < spec and a <= spec comes up in three places: 
+-  - the definition of an ordered or sorted data set,
+-  - the definition of a stable sorting algorithm, and
+-  - correctness of quicksort.
+-
+-+ We say that a data set (a list or vector) is *sorted* or *ordered*
+-  if it contains no adjacent pair of values ... X Y ... such that Y < X. 
+-
+-  In other words, scanning across the data never takes a "downwards" step.
+-
+-  If you use a <= procedure where these algorithms expect a <
+-  procedure, you may not get the answers you expect. For example,
+-  the LIST-SORTED? function will return false if you pass it a <= comparison
+-  function and an ordered list containing adjacent equal elements.
+-
+-+ A "stable" sort is one that preserves the pre-existing order of equal
+-  elements. Suppose, for example, that we sort a list of numbers by 
+-  comparing their absolute values, i.e., using comparison function
+-    (lambda (x y) (< (abs x) (abs y)))
+-  If we sort a list that contains both 3 and -3:
+-    ... 3 ... -3 ...
+-  then a stable sort is an algorithm that will not swap the order
+-  of these two elements, that is, the answer is guaranteed to to look like
+-    ... 3 -3 ...
+-  not
+-    ... -3 3 ...
+-
+-  Choosing < for the comparison function instead of <= affects how stability
+-  is coded. Given an adjacent pair X Y, (< y x) means "Y should be moved in
+-  front of X" -- otherwise, leave things as they are. So using a <= function
+-  where a < function is expected will *invert* stability.
+-
+-  This is due to the definition of equality, given a < comparator:
+-    (and (not (< x y))
+-         (not (< y x)))
+-  The definition is rather different, given a <= comparator:
+-    (and (<= x y)
+-         (<= y x))
+-
+-+ A "stable" merge is one that reliably favors one of its data sets
+-  when equal items appear in both data sets. *All merge operations in
+-  this library are stable*, breaking ties between data sets in favor
+-  of the first data set -- elements of the first list come before equal 
+-  elements in the second list.
+-
+-  So, if we are merging two lists of numbers ordered by absolute value,
+-  the stable merge operation LIST-MERGE
+-    (list-merge (lambda (x y) (< (abs x) (abs y)))
+-                '(0 -2 4 8 -10) '(-1 3 -4 7))
+-  reliably places the 4 of the first list before the equal-comparing -4
+-  of the second list:
+-    (0 -1 -2 4 -4 7 8 -10)
+-
+-+ Some sort algorithms will *not work correctly* if given a <= when they
+-  expect a < comparison (or vice-versa). For example, violating quicksort's
+-  spec may cause it to produce wrong answers, diverge, raise an error, or do
+-  some fourth thing. To see why, consider the left-scan part of the standard
+-  quicksort partition step:
+-	    (let ((i (let scan ((i i)) (if (elt< (vector-ref v i) pivot)
+-					   (scan (+ i 1))
+-					   i))))
+-	      ...)
+-  Consider applying this loop to a vector of all zeroes (hence, PIVOT, as
+-  well, is zero), but erroneously using <= for the ELT< function. The loop
+-  will scan right off the end of the vector, producing a vector-index error.
+-  The guarantee that the scan loop will terminate before running off the end
+-  of the vector depends critically upon ELT< performing as a true, irreflexive
+-  < relation. Running off the end of the vector is only one of a variety of 
+-  possibly ways to lose -- other, variant implementations of quicksort can, 
+-  instead, loop forever on some data sets if ELT< is a <= predicate.
+-
+-In short, if your comparison function F answers true to (F x x), then 
+-  - using a stable sorting or merging algorithm will not give you a 
+-    stable sort or merge, 
+-  - LIST-SORTED? may surprise you, and 
+-  - quicksort may fail in a variety of possible ways.
+-Note that  you can synthesize a < function from a <= function with
+-    (lambda (x y) (not (<= y x)))
+-if need be. 
+-
+-Precise definitions give sharp edges to tools, but require care in use. 
+-"Measure twice, cut once."
+-
+-I have adopted the choice of < from Common Lisp. One would assume the definers
+-of Common Lisp had a good reason for adopting < instead of <=, but canvassing
+-several of the principal actors in the definition process has turned up no
+-better reason than "an arbitrary but consistent choice." At minimum, then,
+-this SRFI extends the coverage of that consistent choice.
+-
+-** All vector operations accept optional subrange parameters
+-============================================================
+-The vector operations specified below all take optional START/END arguments
+-indicating a selected subrange of a vector's elements. If a START parameter or
+-START/END parameter pair is given to such a procedure, they must be exact,
+-non-negative integers, such that
+-    0 <= START <= END <= (VECTOR-LENGTH V)
+-where V is the related vector parameter. If not specified, they default to 0
+-and the length of the vector, respectively. They are interpreted to select the
+-range [START,END), that is, all elements from index START (inclusive) up to,
+-but not including, index END.
+-
+-** Required vs. allowed side-effects
+-====================================
+-LIST-SORT! and LIST-STABLE-SORT! are allowed, but not required,
+-to alter their arguments' cons cells to construct the result list. This is
+-consistent with the what-not-how character of the group of procedures
+-to which they belong (the "sort-lib" package).
+-
+-The LIST-DELETE-NEIGHBOR-DUPS!, LIST-MERGE! and LIST-MERGE-SORT! procedures,
+-on the other hand, provide specific algorithms, and, as such, explicitly
+-commit to the use of side-effects on their input lists in order to guarantee
+-their key algorithmic properties (e.g., linear-time operation, constant-space
+-stack use).
+-
+--------------------------------------------------------------------------------
+-* Procedure specification
+--------------------------
+-The procedures are split into several packages. In a Scheme system that has a
+-module or package system, these procedures should be contained in modules
+-named as follows:
+-   Package name			Functionality
+-   ------------			-------------
+-   sort-lib			General sorting for lists & vectors
+-   sorted?-lib			Sorted predicates for lists & vectors
+-   list-merge-sort-lib		List merge sort
+-   vector-merge-sort-lib	Vector merge sort
+-   vector-heap-sort-lib		Vector heap sort
+-   vector-quick-sort-lib	Vector quick sort
+-   vector-insert-sort-lib	Vector insertion sort
+-   delndup-lib			List and vector delete neighbor duplicates
+-   binsearch-lib		Vector binary search
+-
+-A Scheme system without a module system should provide all of the bindings
+-defined in all of these modules as components of the "SRFI-32" package.
+-
+-Note that there is no "list insert sort" package, as you might as well always
+-use list merge sort. The reference implementation's destructive list merge
+-sort will do fewer SET-CDR!s than a destructive insert sort.
+-
+-** Procedure naming and functionality
+-=====================================
+-Almost all of the procedures described below are variants of two basic
+-operations: sorting and merging. These procedures are consistently named
+-by composing a set of basic lexemes to indicate what they do.
+-
+-Lexeme	  Meaning
+-------	  -------
+-"sort"	  The procedure sorts its input data set by some < comparison function.
+-
+-"merge"	  The procedure merges two ordered data sets into a single ordered
+-	  result.
+-
+-"stable"  This lexeme indicates that the sort is a stable one.
+-
+-"vector"  The procedure operates upon vectors.
+-
+-"list"	  The procedure operates upon lists.
+-
+-"!"	  Procedures that end in "!" are allowed, and sometimes required, 
+-	  to reuse their input storage to construct their answer.
+-
+-** Types of parameters and return values
+-========================================
+-In the procedures specified below,
+-  - A LIS parameter is a list;
+-      
+-  - A V parameter is a vector;
+-      
+-  - A < or = parameter is a procedure accepting two arguments taken from the
+-    specified procedure's data set(s), and returning a boolean;
+-      
+-  - START and END parameters are exact, non-negative integers that 
+-    serve as vector indices selecting a subrange of some associated vector.
+-    When specified, they must satisfy the relation
+-        0 <= start <= end <= (vector-length v)
+-    where V is the associated vector.
+-
+-Passing values to procedures with these parameters that do not satisfy these
+-types is an error.
+-
+-If a procedure is said to return "unspecified," this means that nothing at all
+-is said about what the procedure returns, not even the number of return
+-values. Such a procedure is not even required to be consistent from call to
+-call in the nature or number of its return values. It is simply required to
+-return a value (or values) that may be passed to a command continuation, e.g.
+-as the value of an expression appearing as a non-terminal subform of a BEGIN
+-expression. Note that in R5RS, this restricts such a procedure to returning a
+-single value; non-R5RS systems may not even provide this restriction.
+-
+-** sort-lib - general sorting package
+-=====================================
+-This library provides basic sorting and merging functionality suitable for
+-general programming. The procedures are named by their semantic properties,
+-i.e., what they do to the data (sort, stable sort, merge, and so forth).
+-
+-    Procedure						Suggested algorithm
+-    -------------------------------------------------------------------------
+-    list-sorted? < lis -> boolean
+-    list-merge  < lis1 lis2 -> list
+-    list-merge! < lis1 lis2 -> list
+-    list-sort  < lis -> list				(vector heap or quick)
+-    list-sort! < lis -> list				(list merge sort)
+-    list-stable-sort  < lis -> list			(vector merge sort)
+-    list-stable-sort! < lis -> list			(list merge sort)
+-    list-delete-neighbor-dups  = lis -> list
+-    list-delete-neighbor-dups! = lis -> list
+-
+-    vector-sorted? < v [start end]	-> boolean
+-    vector-merge  < v1 v2 [start1 end1 start2 end2] -> vector
+-    vector-merge! < v v1 v2 [start start1 end1 start2 end2] -> unspecified
+-    vector-sort  < v [start end] 	-> vector	(heap or quick sort)
+-    vector-sort! < v [start end]	-> unspecified	(heap or quick sort)
+-    vector-stable-sort  < v [start end] -> vector	(vector merge sort)
+-    vector-stable-sort! < v [start end] -> unspecified	(vector merge sort)
+-    vector-delete-neighbor-dups  = v [start end] -> vector
+-    vector-delete-neighbor-dups! = target source [t-start s-start s-end] -> t-end
+-
+-    LIST-SORTED? and VECTOR-SORTED? return true if their input list or vector
+-    is in sorted order, as determined by their < comparison parameter.
+-
+-    All four merge operations are stable: an element of the initial list LIS1
+-    or vector V1 will come before an equal-comparing element in the second
+-    list LIS2 or vector V2 in the result.
+-
+-    The procedures
+-      LIST-MERGE
+-      LIST-SORT
+-      LIST-STABLE-SORT
+-      LIST-DELETE-NEIGHBOR-DUPS
+-    do not alter their inputs and are allowed to return a value that shares 
+-    a common tail with a list argument.
+-
+-    The procedures
+-      LIST-SORT!
+-      LIST-STABLE-SORT!
+-    are "linear update" operators -- they are allowed, but not required, to
+-    alter the cons cells of their arguments to produce their results. 
+-
+-    On the other hand, the procedures
+-      LIST-DELETE-NEIGHBOR-DUPS!
+-      LIST-MERGE!
+-    make only a single, iterative, linear-time pass over their argument lists,
+-    using SET-CDR!s to rearrange the cells of the lists into the final result
+-    -- they work "in place." Hence, any cons cell appearing in the result must
+-    have originally appeared in an input. The intent of this
+-    iterative-algorithm commitment is to allow the programmer to be sure that
+-    if, for example, LIST-MERGE! is asked to merge two ten-million-element
+-    lists, the operation will complete without performing some extremely
+-    (possibly twenty-million) deep recursion.
+-
+-    The vector procedures
+-      VECTOR-SORT
+-      VECTOR-STABLE-SORT
+-      VECTOR-DELETE-NEIGHBOR-DUPS
+-    do not alter their inputs, but allocate a fresh vector for their result,
+-    of length END - START. 
+-
+-    The vector procedures
+-      VECTOR-SORT!
+-      VECTOR-STABLE-SORT!
+-    sort their data in-place. (But note that VECTOR-STABLE-SORT! may 
+-    allocate temporary storage proportional to the size of the input --
+-    I am not aware of O(n lg n) stable vector-sorting algorithms that
+-    run in constant space.)
+-
+-    VECTOR-MERGE returns a vector of length (END1-START1)+(END2-START2).
+-    
+-    VECTOR-MERGE! writes its result into vector V, beginning at index START,
+-    for indices less than END = START + (END1-START1) + (END2-START2). The 
+-    target subvector 
+-      V[start,end)
+-    may not overlap either source subvector 
+-      V1[start1,end1)
+-      V2[start2,end2).
+-
+-    The ...-DELETE-NEIGHBOR-DUPS-... procedures:
+-    These procedures delete adjacent duplicate elements from a list or a
+-    vector, using a given element-equality procedure. The first/leftmost
+-    element of a run of equal elements is the one that survives. The list or
+-    vector is not otherwise disordered.
+-    
+-    These procedures are linear time -- much faster than the O(n^2) general
+-    duplicate-element deletors that do not assume any "bunching" of elements
+-    (such as the ones provided by SRFI-1). If you want to delete duplicate
+-    elements from a large list or vector, you can sort the elements to bring
+-    equal items together, then use one of these procedures, for a total time
+-    of O(n lg n).
+-    
+-    The comparison function = passed to these procedures is always applied
+-      (= x y)
+-    where X comes before Y in the containing list or vector.
+-
+-    - LIST-DELETE-NEIGHBOR-DUPS does not alter its input list; its answer
+-      may share storage with the input list.
+-
+-    - VECTOR-DELETE-NEIGHBOR-DUPS does not alter its input vector, but
+-      rather allocates a fresh vector to hold the result.
+-
+-    - LIST-DELETE-NEIGHBOR-DUPS! is permitted, but not required, to
+-      mutate its input list in order to construct its answer.
+-
+-    - VECTOR-DELETE-NEIGHBOR-DUPS! reuses its input vector to hold the
+-      answer, packing its answer into the index range [start,end'), where
+-      END' is the non-negative exact integer returned as its value. It
+-      returns END' as its result. The vector is not altered outside the range
+-      [start,end').
+-
+-    - VECTOR-DELETE-NEIGHBOR-DUPS! scans vector SOURCE in range
+-      [S-START,S-END), writing its result to vector TARGET beginning at index
+-      T-START. It returns exact, non-negative integer T-END, which indicates
+-      that the results of the operation are found in index range
+-      [T-START,T-END) of TARGET; elements of TARGET outside this range
+-      are unaltered.
+-      
+-      It is an error for memory cell TARGET[T-START] to be a memory cell in
+-      the region SOURCE[1 + S-START, S-END). In a Scheme implementation
+-      that does not allow distinct vectors to share storage, this means
+-      that one of the following must be true:
+-        1. (not (eq? source target))
+-        2. t-start not-in [s-start + 1, s-end)
+-
+-    - Examples:
+-	(list-delete-neighbor-dups = '(1 1 2 7 7 7 0 -2 -2))
+-          => (1 2 7 0 -2)
+-
+-	(vector-delete-neighbor-dups = '#(1 1 2 7 7 7 0 -2 -2))
+-          => #(1 2 7 0 -2)
+-
+-	(vector-delete-neighbor-dups = '#(1 1 2 7 7 7 0 -2 -2) 3 7)
+-          => #(7 0 -2)
+-
+-        ;; Result left in v[3,9):
+-        (let ((v (vector 0 0 0 1 1 2 2 3 3 4 4 5 5 6 6)))
+-          (cons (vector-delete-neighbor-dups! = v 3)
+-                v))
+-           => (9 . #(0 0 0 1 2 3 4 5 6 4 4 5 5 6 6))
+-
+-
+-** Algorithm-specific sorting packages
+-======================================
+-These packages provide more specific sorting functionality, that is,
+-specific commitment to particular algorithms that have particular
+-pragmatic consequences (such as memory locality, asymptotic running time)
+-beyond their semantic behaviour (sorting, stable sorting, merging, etc.).
+-Programmers that need a particular algorithm can use one of these packages.
+-
+-sorted?-lib - sorted predicates
+-    list-sorted?   < lis	   -> boolean
+-    vector-sorted? < v [start end] -> boolean
+-
+-    Return #f iff there is an adjacent pair ... X Y ... in the input
+-    list or vector such that Y < X. The optional START/END range 
+-    arguments restrict VECTOR-SORTED? to the indicated subvector.
+-
+-list-merge-sort-lib - list merge sort
+-    list-merge-sort  < lis	-> list
+-    list-merge-sort! < lis	-> list
+-    list-merge  lis1 < lis2	-> list
+-    list-merge! lis1 < lis2	-> list
+-
+-    The sort procedures sort their data using a list merge sort, which is
+-    stable. (The reference implementation is, additionally, a "natural" sort.
+-    See below for the properties of this algorithm.)
+-
+-    The ! procedures are destructive -- they use SET-CDR!s to rearrange the
+-    cells of the lists into the proper order. As such, they do not allocate
+-    any extra cons cells -- they are "in place" sorts. Additionally,
+-    LIST-MERGE! is iterative -- it can operate on arguments of arbitrary size
+-    with a constant number of stack frames.
+-
+-    The merge operations are stable: an element of LIS1 will come before an
+-    equal-comparing element in LIS2 in the result list.
+-
+-vector-merge-sort-lib - vector merge sort
+-    vector-merge-sort  < v [start end temp]			-> vector
+-    vector-merge-sort! < v [start end temp]			-> unspecified
+-    vector-merge  < v1 v2 [start1 end1 start2 end2]		-> vector
+-    vector-merge! < v v1 v2 [start start1 end1 start2 end2]	-> unspecified
+-
+-    The sort procedures sort their data using vector merge sort, which is
+-    stable. (The reference implementation is, additionally, a "natural" sort.
+-    See below for the properties of this algorithm.)
+-
+-    The optional START/END arguments provide for sorting of subranges, and
+-    default to 0 and the length of the corresponding vector.
+-    
+-    Merge-sorting a vector requires the allocation of a temporary "scratch"
+-    work vector for the duration of the sort. This scratch vector can be
+-    passed in by the client as the optional TEMP argument; if so, the supplied
+-    vector must be of size >= END, and will not be altered outside the range
+-    [start,end). If not supplied, the sort routines allocate one themselves.
+-
+-    The merge operations are stable: an element of V1 will come before an
+-    equal-comparing element in V2 in the result vector.
+-
+-    VECTOR-MERGE-SORT! leaves its result in V[start,end).
+-
+-    VECTOR-MERGE-SORT returns a vector of length END-START.
+-    
+-    VECTOR-MERGE returns a vector of length (END1-START1)+(END2-START2).
+-    
+-    VECTOR-MERGE! writes its result into vector V, beginning at index START,
+-    for indices less than END = START + (END1-START1) + (END2-START2). The 
+-    target subvector 
+-      V[start,end)
+-    may not overlap either source subvector 
+-      V1[start1,end1)
+-      V2[start2,end2).
+-
+-vector-heap-sort-lib - vector heap sort
+-    heap-sort  < v [start end] -> vector
+-    heap-sort! < v [start end] -> unspecified
+-
+-    These procedures sort their data using heap sort, 
+-    which is not a stable sorting algorithm.
+-    
+-    HEAP-SORT returns a vector of length END-START. 
+-    HEAP-SORT! is in-place, leaving its result in V[start,end).
+-
+-vector-quick-sort-lib - vector quick sort
+-    quick-sort   < v [start end] -> vector
+-    quick-sort!  < v [start end] -> unspecified
+-    quick-sort3! c v [start end] -> unspecified
+-
+-    These procedures sort their data using quick sort, 
+-    which is not a stable sorting algorithm.
+-    
+-    QUICK-SORT returns a vector of length END-START. 
+-    QUICK-SORT! is in-place, leaving its result in V[start,end).
+-
+-    QUICK-SORT3! is a variant of quick-sort that takes a three-way
+-    comparison function C. C compares a pair of elements and returns
+-    an exact integer whose sign indicates their relationship:
+-      (c x y) < 0   =>   x<y
+-      (c x y) = 0   =>   x=y
+-      (c x y) > 0   =>   x>y
+-    To help remember the relationship between the sign of the result and
+-    the relation, use the function - as the model for C: (- x y) < 0
+-    means that x < y; (- x y) > 0 means that x > y.
+-
+-    The extra discrimination provided by the three-way comparison can
+-    provide significant speedups when sorting data sets with many duplicates,
+-    especially when the comparison function is relatively expensive (e.g.,
+-    comparing long strings).
+-
+-    WARNING: Some sort algorithms, such as insertion sort or heap sort,
+-    can tolerate being passed a <= comparison function when they expect a < 
+-    function -- insertion and merge sort may simply invert stability; and
+-    heap sort will run a bit slower, but otherwise produce a correct answer.
+-
+-    Quicksort, however, is much more critically sensitive to the distinction
+-    between a < and a <= comparison. If QUICK-SORT or QUICK-SORT! expect a <
+-    comparison function, and are erroneously given a <= function, they may,
+-    depending on implementation, produce an unsorted result, go into an 
+-    infinite loop, cause a run-time error, occasionally produce a correct
+-    result, or do some fifth thing.
+-
+-    Implementors may wish to write QUICKSORT3! so that it (a) tests the
+-    comparison function (by checking that (c v[start] v[start]) produces
+-    false), or (b) is tolerant of an erroneous <= function, or (c) both.
+-    Clients of this function, however, should not count on this.
+-
+-vector-insert-sort-lib - vector insertion sort
+-    insert-sort  < v [start end] -> vector
+-    insert-sort! < v [start end] -> unspecified
+-    
+-    These procedures stably sort their data using insertion sort.
+-    
+-    INSERT-SORT returns a vector of length END-START.
+-    INSERT-SORT! is in-place, leaving its result in V[start,end).
+-
+-delndup-lib - list and vector delete neighbor duplicates
+-    list-delete-neighbor-dups  = lis -> list
+-    list-delete-neighbor-dups! = lis -> list
+-    
+-    vector-delete-neighbor-dups  = v [start end] -> vector
+-    vector-delete-neighbor-dups! = v [start end] -> end'
+-
+-    These procedures delete adjacent duplicate elements from a list or
+-    a vector, using a given element-equality procedure =. The first/leftmost
+-    element of a run of equal elements is the one that survives. The list
+-    or vector is not otherwise disordered.
+-
+-    These procedures are linear time -- much faster than the O(n^2) general
+-    duplicate-element deletors that do not assume any "bunching" of elements
+-    (such as the ones provided by SRFI-1). If you want to delete duplicate
+-    elements from a large list or vector, you can sort the elements to bring
+-    equal items together, then use one of these procedures, for a total time
+-    of O(n lg n).
+-    
+-    The comparison function = passed to these procedures is always applied
+-      (= x y)
+-    where X comes before Y in the containing list or vector.
+-
+-    LIST-DELETE-NEIGHBOR-DUPS does not alter its input list; its answer
+-    may share storage with the input list.
+-
+-    VECTOR-DELETE-NEIGHBOR-DUPS does not alter its input vector, but
+-    rather allocates a fresh vector to hold the result.
+-
+-    LIST-DELETE-NEIGHBOR-DUPS! is permitted, but not required, to
+-    mutate its input list in order to construct its answer.
+-
+-    VECTOR-DELETE-NEIGHBOR-DUPS! reuses its input vector to hold the
+-    answer, packing its answer into the index range [start,end'), where
+-    END' is the non-negative exact integer returned as its value. It
+-    returns END' as its result. The vector is not altered outside the range
+-    [start,end').
+-
+-    Examples:
+-	(list-delete-neighbor-dups = '(1 1 2 7 7 7 0 -2 -2))
+-          => (1 2 7 0 -2)
+-
+-	(vector-delete-neighbor-dups = '#(1 1 2 7 7 7 0 -2 -2))
+-          => #(1 2 7 0 -2)
+-
+-	(vector-delete-neighbor-dups = '#(1 1 2 7 7 7 0 -2 -2) 3 7)
+-          => #(7 0 -2)
+-
+-        ;; Result left in v[3,9):
+-        (let ((v (vector 0 0 0 1 1 2 2 3 3 4 4 5 5 6 6)))
+-          (cons (vector-delete-neighbor-dups! = v 3)
+-                v))
+-           => (9 . #(0 0 0 1 2 3 4 5 6 4 4 5 5 6 6))
+-
+-binsearch-lib - vector binary search lib
+-    vector-binary-search  elt< elt->key key v [start end] -> integer-or-false
+-    vector-binary-search3 c                 v [start end] -> integer-or-false
+-
+-    VECTOR-BINARY-SEARCH searches vector V in range [START,END) (which
+-    default to 0 and the length of V, respectively) for an element whose
+-    associated key is equal to KEY. The procedure ELT->KEY is used to map
+-    an element to its associated key. The elements of the vector are assumed
+-    to be ordered by the ELT< relation on these keys. That is, 
+-      (vector-sorted? (lambda (x y) (elt< (elt->key x) (elt->key y)))
+-                      v start end) => true
+-    An element E of V is a match for KEY if it's neither less nor greater
+-    than the key:
+-      (and (not (elt< (elt->key e) key))
+-           (not (elt< key (elt->key e))))
+-    If there is such an element, the procedure returns its index in the
+-    vector as an exact integer. If there is no such element in the searched 
+-    range, the procedure returns false.
+-
+-    (vector-binary-search < car 4 '#((1 . one) (3 . three)
+-				     (4 . four) (25 . twenty-five)))
+-    => 2
+-
+-    (vector-binary-search < car 7 '#((1 . one) (3 . three)
+-				     (4 . four) (25 . twenty-five)))
+-    => #f
+-    
+-    VECTOR-BINARY-SEARCH3 is a variant that uses a three-way comparison
+-    function C. C compares its parameter to the search key, and returns an
+-    exact integer whose sign indicates its relationship to the search key.
+-      (c x) < 0   =>   x < search-key
+-      (c x) = 0   =>   x = search-key
+-      (c x) > 0   =>   x > search-key
+-
+-    (vector-binary-search3 (lambda (elt) (- (car elt) 4))
+-                           '#((1 . one) (3 . three)
+-			      (4 . four) (25 . twenty-five)))
+-    => 2
+-    
+-    Rationale:
+-    - Why isn't VECTOR-BINARY-SEARCH's ELT->KEY computation simply absorbed
+-      into the < function? It is separated out because the < function is
+-      applied twice inside the binary-search inner loop, once with the search
+-      key for the first argument and the element key for the second argument,
+-      and once, with the reverse argument order. This is not necessary for
+-      VECTOR-BINARY-SEARCH3.
+-  
+-    - When a comparison operation is able to produce a three-way
+-      discrimination, the inner loop of the binary search can trim the number
+-      of per-iteration comparisons from an average of 1.5 to a guaranteed
+-      single comparison per iteration. This can be a significant savings when
+-      searching with an expensive comparison operation (e.g., one that
+-      uses string compare, sends email, references a database, or queries
+-      a network service such as a web server).
+-
+-    - Failure is signaled by false (rather than, say, -1) so that searches
+-      can be used in conditional forms such as
+-        (or (vector-binary-search ...) ...)
+-      or
+-        (cond ((vector-binary-search ...) => index-consumer)
+-              ...)
+-
+--------------------------------------------------------------------------------
+-* Algorithmic properties
+-------------------------
+-Different sort and merge algorithms have different properties.
+-Choose the algorithm that matches your needs:
+-
+-Vector insert sort
+-    Stable, but only suitable for small vectors -- O(n^2).
+-
+-Vector quick sort
+-    Not stable. Is fast on average -- O(n lg n) -- but has bad worst-case
+-    behaviour. Has good memory locality for big vectors (unlike heap sort). 
+-    A clever pivot-picking trick (median of three samples) helps avoid 
+-    worst-case behaviour, but pathological cases can still blow up.
+-
+-Vector heap sort
+-    Not stable. Guaranteed fast -- O(n lg n) *worst* case. Poor locality
+-    on large vectors. A very reliable workhorse.
+-
+-Vector merge sort
+-    Stable. Not in-place -- requires a temporary buffer of equal size. 
+-    Fast -- O(n lg n) -- and has good memory locality for large vectors.
+-    
+-    The implementation of vector merge sort provided by this SRFI's reference
+-    implementation is, additionally, a "natural" sort, meaning that it
+-    exploits existing order in the input data, providing O(n) best case.
+-
+-Destructive list merge sort
+-    Stable, fast and in-place (i.e., allocates no new cons cells). "Fast"
+-    means O(n lg n) worse-case, and substantially better if the data
+-    is already mostly ordered, all the way down to linear time for
+-    a completely-ordered input list (i.e., it is a "natural" sort).
+-
+-    Note that sorting lists involves chasing pointers through memory, which
+-    can be a loser on modern machine architectures because of poor cache &
+-    page locality. Pointer *writing*, which is what the SET-CDR!s of a
+-    destructive list-sort algorithm do, is even worse, especially if your
+-    Scheme has a generational GC -- the writes will thrash the write-barrier.
+-    Sorting vectors has inherently better locality.
+-
+-    This SRFI's destructive list merge and merge sort implementations are
+-    opportunistic -- they avoid redundant SET-CDR!s, and try to take long
+-    already-ordered runs of list structure as-is when doing the merges.
+-
+-Pure list merge sort
+-    Stable and fast -- O(n lg n) worst-case, and possibly O(n), depending
+-    upon the input list (see discussion above).
+-
+-
+-Algorithm     Stable?  Worst case  Average case  In-place
+-------------------------------------------------------
+-Vector insert Yes      O(n^2)      O(n^2)        Yes
+-Vector quick  No       O(n^2)      O(n lg n)     Yes
+-Vector heap   No       O(n lg n)   O(n lg n)     Yes
+-Vector merge  Yes      O(n lg n)   O(n lg n)     No
+-List merge    Yes      O(n lg n)   O(n lg n)     Either
+-
+-
+--------------------------------------------------------------------------------
+-* Porting and optimisation
+---------------------------
+-This package should be trivial to port. There are only four non-R4RS bits
+-in the code:
+-- Use of multiple-value return, with the R5RS VALUES procedure, and the
+-  simple (RECEIVE (var ...) mv-exp body ...) multiple-value binding macro
+-  of SRFI-8.
+-
+-- A VECTOR-COPY procedure. This is a tiny little procedure:
+-    (vector-copy v [start end])
+-
+-- Use of the LET-OPTIONALS macro from scsh to parse and default optional
+-  arguments to three routines. Again, easy to port the macro or rewrite
+-  the code to parse, default, and error check the args by hand. 
+-
+-- Calls to an ERROR function for complaining about bad arguments.
+-
+-This code is tightly bummed, as far as I can go in portable Scheme.
+-
+-You could speed up the vector code a lot by error-checking the procedure
+-parameters and then shifting over to fixnum-specific arithmetic and dangerous
+-vector-indexing and vector-setting primitives. The comments in the code
+-indicate where the initial error checks would have to be added. There are
+-several (QUOTIENT N 2)'s that could be changed to a fixnum right-shift, as
+-well, in both the list and vector code (SRFI 33 provides such an operator).
+-The code is designed to enable this -- each file usually exports one or two
+-"safe" procedures that end up calling an internal "dangerous" primitive. The
+-little exported cover procedures are where you move the error checks.
+-
+-This should provide *big* speedups. In fact, all the code bumming I've done
+-pretty much disappears in the noise unless you have a good compiler and also
+-can dump the vector-index checks and generic arithmetic -- so I've really just
+-set things up for you to exploit.
+-
+-The optional-arg parsing, defaulting, and error checking is done with a
+-portable R4RS macro. But if your Scheme has a faster mechanism (e.g., Chez),
+-you should definitely port over to it. Note that argument defaulting and
+-error-checking are interleaved -- you don't have to error-check defaulted
+-START/END args to see if they are fixnums that are legal vector indices for
+-the corresponding vector, etc.
+-
+-
+--------------------------------------------------------------------------------
+-* References & Links
+---------------------
+-
+-This document, in HTML:
+-    http://srfi.schemers.org/srfi-32/srfi-32.html
+-    [This link may not be valid while the SRFI is in draft form.]
+-
+-This document, in simple text format:
+-    http://srfi.schemers.org/srfi-32/srfi-32.txt
+-
+-Archive of SRFI-32 discussion-list email:
+-    http://srfi.schemers.org/srfi-32/mail-archive/maillist.html
+-
+-SRFI web site:
+-    http://srfi.schemers.org/
+-
+-[CommonLisp]
+-    Common Lisp: the Language
+-    Guy L. Steele Jr. (editor).
+-    Digital Press, Maynard, Mass., second edition 1990.
+-    Available at http://www.elwood.com/alu/table/references.htm#cltl2
+-
+-    The Common Lisp "HyperSpec," produced by Kent Pitman, is essentially
+-    the ANSI spec for Common Lisp:
+-    http://www.xanalys.com/software_tools/reference/HyperSpec/
+-
+-[R5RS]
+-    Revised^5 Report on the Algorithmic Language Scheme, 
+-    R. Kelsey, W. Clinger, J. Rees (editors).
+-    Higher-Order and Symbolic Computation, Vol. 11, No. 1, September, 1998.
+-    and ACM SIGPLAN Notices, Vol. 33, No. 9, October, 1998.
+-
+-    Available at http://www.schemers.org/Documents/Standards/
+-
+-
+--------------------------------------------------------------------------------
+-* Acknowledgements
+-------------------
+-
+-I thank the authors of the open source I consulted when designing this
+-library, particularly Richard O'Keefe, Donovan Kolby and the MIT Scheme Team.
+-
+-
+--------------------------------------------------------------------------------
+-* Copyright
+------------
+-
+-** SRFI text
+-============
+-This document is copyright (C) Olin Shivers (1998, 1999). 
+-All Rights Reserved. 
+-
+-This document and translations of it may be copied and furnished to others,
+-and derivative works that comment on or otherwise explain it or assist in its
+-implementation may be prepared, copied, published and distributed, in whole or
+-in part, without restriction of any kind, provided that the above copyright
+-notice and this paragraph are included on all such copies and derivative
+-works. However, this document itself may not be modified in any way, such as
+-by removing the copyright notice or references to the Scheme Request For
+-Implementation process or editors, except as needed for the purpose of
+-developing SRFIs in which case the procedures for copyrights defined in the
+-SRFI process must be followed, or as required to translate it into languages
+-other than English.
+-
+-The limited permissions granted above are perpetual and will not be revoked by
+-the authors or their successors or assigns.
+-
+-This document and the information contained herein is provided on an "AS IS"
+-basis and THE AUTHORS AND THE SRFI EDITORS DISCLAIM ALL WARRANTIES, EXPRESS OR
+-IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTY THAT THE USE OF THE
+-INFORMATION HEREIN WILL NOT INFRINGE ANY RIGHTS OR ANY IMPLIED WARRANTIES OF
+-MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE.
+-
+-** Reference implementation
+-===========================
+-Short summary: no restrictions.
+-
+-While I wrote all of this code myself, I read a lot of code before I began
+-writing. However, all such code is, itself, either open source or public
+-domain, rendering irrelevant any issue of "copyright taint."
+-
+-The natural merge sorts (pure list, destructive list, and vector) are not only
+-my own code, but are implementations of an algorithm of my own devising. They
+-run in O(n lg n) worst case, O(n) best case, and require only a logarithmic
+-number of stack frames. And they are stable. And the destructive-list variant
+-allocates zero cons cells; it simply rearranges the cells of the input list.
+-
+-Hence the reference implementation is
+-    Copyright (c) 1998 by Olin Shivers.
+-and made available under the same copyright as the SRFI text (see above).
+diff -urN racket-6.12-orig/share/pkgs/srfi-lib/srfi/32/srfi-32.txt racket-6.12/share/pkgs/srfi-lib/srfi/32/srfi-32.txt
+--- racket-6.12-orig/share/pkgs/srfi-lib/srfi/32/srfi-32.txt	1969-12-31 19:00:00.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-lib/srfi/32/srfi-32.txt	2018-01-31 12:22:58.152501970 -0500
+@@ -0,0 +1,938 @@
++The SRFI-32 sort libraries					-*- outline -*-
++Olin Shivers
++First draft: 1998/10/19
++Last update: 2002/7/21
++
++Emacs should display this document in outline mode. Say c-h m for
++instructions on how to move through it by sections (e.g., c-c c-n, c-c c-p).
++
++* Table of contents
++-------------------
++Abstract
++Procedure index
++Introduction
++What's wrong with the current state of affairs?
++Design rules
++  What vs. how
++  Consistency across function signatures
++  Data parameter first, less-than parameter after
++  Ordering, comparison functions & stability
++  All vector operations accept optional subrange parameters
++  Required vs. allowed side-effects
++Procedure specification
++  Procedure naming and functionality
++  Types of parameters and return values
++  sort-lib - general sorting package
++  Algorithm-specific sorting packages
++Algorithmic properties
++Topics to be resolved during discussion phase
++Porting and optimisation
++References & Links
++Acknowledgements
++Copyright
++
++
++* Abstract
++----------
++Current Scheme sorting packages are, every one of them, surprisingly bad. I've
++designed the API for a full-featured sort toolkit, which I propose as an SRFI.
++The spec comes with 1200 lines of high-quality reference code: tightly
++written, highly commented, portable code, available for free. Implementors
++want this code. It's better than what you have.
++
++-------------------------------------------------------------------------------
++* Procedure index
++-----------------
++list-sorted?			vector-sorted?
++
++list-merge			vector-merge
++list-sort			vector-sort
++list-stable-sort		vector-stable-sort
++list-delete-neighbor-dups	vector-delete-neighbor-dups
++
++list-merge!			vector-merge!
++list-sort!			vector-sort!
++list-stable-sort!		vector-stable-sort!
++list-delete-neighbor-dups!	vector-delete-neighbor-dups!
++
++heap-sort   quick-sort   insert-sort   list-merge-sort   vector-merge-sort
++heap-sort!  quick-sort!  insert-sort!  list-merge-sort!  vector-merge-sort!
++
++-------------------------------------------------------------------------------
++* Introduction
++--------------
++As I'll detail bewlow, I wasn't very happy with the state of the Scheme
++world for sorting and merging lists and vectors. So I have designed and 
++written a fairly comprehensive sorting & merging toolkit. It is
++
++    - very portable,
++
++    - much better code than what is currently in Elk, Gambit, Bigloo, 
++      Scheme->C, MzScheme, RScheme, Scheme48, MIT Scheme, or slib, and 
++
++    - priced to move: free code.
++
++The package includes
++    - Vector insert sort (stable)
++    - Vector heap sort
++    - Vector quick sort (with median-of-3 pivot picking)
++    - Vector merge sort (stable)
++    - Pure and destructive list merge sort (stable)
++    - Stable vector and list merge
++    - Miscellaneous sort-related procedures: Vector and list merging, 
++      sorted? predicates, vector binary search, vector and list 
++      delete-equal-neighbor procedures.
++    - A general, non-algorithmic set of procedure names for general sorting
++      and merging.
++
++Scheme programmers may want to adopt this package. I'd like Scheme
++implementors to adopt this code and its API -- in fact, the code is a bribe to
++make it easy for implementors to converge on the suggested API. I mean, you'd
++really have to be a boor to take this free code I wrote and mutate its
++interface over to your incompatible, unportable API, wouldn't you? But you
++could, of course -- it's freely available. More in the spirit of the offering,
++you could make this API available, and then also write a little module
++providing your old interface that is defined in terms of this API. "Scheme
++implementors," in this context, includes slib, which isn't really a standalone
++implementation of Scheme, but is an influential collection of API's and code.
++
++The code is tightly bummed. It is clearly written, and commented in my usual
++voluminous style. This includes notes on porting and implementation-specific
++optimisations.
++
++
++-------------------------------------------------------------------------------
++* What's wrong with the current state of affairs?
++-------------------------------------------------
++
++It's just amazing to me that in 2002, sorting and merging hasn't been
++completely put to bed. These are well-understood algorithms, each of them well
++under a page of code. The straightforward algorithms are basic, core stuff --
++sophomore-level. But if you tour the major Scheme implementations out there on
++the Net, you find badly written code that provides extremely spotty coverage
++of the algorithm space. One implementation even has a buggy implementation
++that has been in use for about 20 years!
++
++Open source-code is a wonderful thing. In a couple of hours, I was able to
++download and check the sources of 9 Scheme systems. Here are my notes from the
++systems I checked. You can skip to the next section if you aren't morbidly
++curious.
++
++slib
++  sorted? vector-or-list <
++  merge  list1 list2 <
++  merge! list1 list2 <
++  sort  vector-or-list <
++  sort! vector-or-list <
++
++  Richard O'Keefe's stable list merge sort is right idea, but implemented 
++  using gratuitous variable side effects. It also does redundant SET-CDR!s.
++  The vector sort converts to list, merge sorts, then reconverts
++  to vector. This is a bad idea -- non-local pointer chasing bad; vector 
++  shuffling good.
++
++MIT Scheme
++  sort!       vector <
++  merge-sort! vector <
++  quick-sort! vector <
++
++  sort       vector-or-list <
++  merge-sort vector-or-list <
++  quick-sort vector-or-list <
++
++  Naive vector quicksort: loser, for worst-case performance reasons.
++  List sort by "list->vector; quicksort; vector->list," hence also loser.
++  A clever stable vector merge sort, albeit not very bummed.
++
++Scheme 48 & T
++  sort-list  list <
++  sort-list! list <
++  list-merge! list1 list2 <
++
++  Bob Nix's implementation of online merge-sort, written in the early 80's. 
++  Conses unnecessary bookkeeping structure, which isn't necessary with a
++  proper recursive formulation. Also, does redundant SET-CDR!s. No vector
++  sort. Also, has a bug -- is claimed to be a stable sort, but isn't! To see
++  this, get the S48 code, and try
++    (define (my< x y) (< (quotient x 2) (quotient y 2)))
++    (list-merge! (list 0 2) (list   3) my<)		; -> (0 2 3)
++    (list-merge! (list   2) (list 0 3) my<)		; -> (0 3 2)
++  This could be fixed very easily, but it isn't worth it given the 
++  other problems with the algorithm.
++
++RScheme
++  vector-sort! vector <
++  sort collection <
++
++  Good basic implementation of vector heapsort, which has O(n lg n)
++  worst-case time. Code ugly, needs tuning. List sort by "list->vector; 
++  sort; vector->list", which allocates unneeded temp storage. Nothing
++  for stable sorting.
++
++MzScheme
++  Naive quicksort -- but not available for vector sorting, even
++  though it internally uses a vector. Nothing for stable sorting,
++  and naive quicksort has bad worst-case behaviour.
++
++Bigloo, Scheme->C
++  Couldn't find anything -- but maybe I didn't search for the right
++  thing, since the Bigloo names are French. (I invite correction from
++  the Bigloo implementors.)
++
++Gambit
++  sort-list list <
++  Nothing for vectors. Simple, slow, unstable merge sort for lists.
++
++Elk
++  Another naive quicksort. Lists handled by converting to vector.
++  sort  vector-or-list <
++  sort! vector-or-list <
++
++Chez Scheme
++  merge  < list1 list2
++  merge! < list1 list2
++  sort  < list
++  sort! < list
++
++  These are stable. I have not seen the source code.
++
++Common Lisp
++  sort        sequence < [key]
++  stable-sort sequence < [key]
++  merge result-type sequence1 sequence2 < [key]
++
++  The sort procedures are allowed, but not required, to be destructive.
++
++SML/NJ
++  sort: ('a*'a -> bool) -> 'a list -> 'a list
++  "Smooth applicative merge sort," which is stable.
++  There is also a highly bummed quicksort for vectors.
++
++The right solution: Implement a full toolbox of carefully written standard sort
++routines.
++
++Having the source available for all of these above-cited Schemes made
++life a lot easier writing this code. I appreciate the authors making their
++source available under such open terms.
++
++
++-------------------------------------------------------------------------------
++* Design rules
++--------------
++
++** What vs. how
++===============
++There are two different interfaces: "what" (simple) & "how" (detailed).
++
++    - Simple: you specify semantics: datatype (list or vector), 
++      mutability, and stability.
++
++    - Detailed: you specify the actual algorithm (quick, heap,
++      insert, merge). Different algorithms have different properties,
++      both semantic & pragmatic, so these exports are necessary.
++
++      It is necessarily the case that the specifications of these procedures
++      make statements about execution "pragmatics." For example, the sole
++      distinction between heap sort and quick sort -- both of which are
++      provided by this library -- is one of execution time, which is not a
++      "semantic" distinction. Similar resource-use statements are made about
++      "iterative" procedures, meaning that they can execute on input of
++      arbitrary size without needing to allocate an unbounded number of stack
++      frames.
++
++** Consistency across function signatures
++=========================================
++The two interfaces share common function signatures wherever
++possible, to facilitate switching a given call from one procedure
++to another.
++	
++** Data parameter first, less-than parameter after
++==================================================
++These procedures uniformly observe the following parameter order:
++the data to be sorted come before the the comparison function.
++That is, we write
++  (sort lis <)
++not
++  (sort < lis).
++This is consistent with every single implementation out there, with
++the sole exception of Chez Scheme.
++
++In my opinion, it would be more consistent with other Scheme libraries
++to put the ordering function first -- the "operation currying" convention.
++(E.g., consider FOR-EACH or MAP or FIND.) I decided to leave things as they
++are in favor of near-total backwards compatibility with existing practice.
++
++[Perhaps this should be discussed.]
++
++** Ordering, comparison functions & stability
++=============================================
++These routines take a < comparison function, not a <= comparison
++function, and they sort into increasing order. The difference between
++a < spec and a <= spec comes up in two places: 
++  - the definition of an ordered or sorted data set, and 
++  - the definition of a stable sorting algorithm.
++
+++ We say that a data set (a list or vector) is *sorted* or *ordered*
++  if it contains no adjacent pair of values ... X Y ... such that Y < X. 
++
++  In other words, scanning across the data never takes a "downwards" step.
++
++  If you use a <= procedure where these algorithms expect a <
++  procedure, you may not get the answers you expect. For example,
++  the LIST-SORTED? function will return false if you pass it a <= comparison
++  function and an ordered list containing adjacent equal elements.
++
+++ A "stable" sort is one that preserves the pre-existing order of equal
++  elements. Suppose, for example, that we sort a list of numbers by 
++  comparing their absolute values, i.e., using comparison function
++    (lambda (x y) (< (abs x) (abs y)))
++  If we sort a list that contains both 3 and -3:
++    ... 3 ... -3 ...
++  then a stable sort is an algorithm that will not swap the order
++  of these two elements, that is, the answer will look like
++    ... 3 -3 ...
++  not
++    ... -3 3 ...
++
++  Choosing < for the comparison function instead of <= affects how stability
++  is coded. Given an adjacent pair X Y, (< y x) means "Y should be moved in
++  front of X" -- otherwise, leave things as they are. So using a <= function
++  where a < function is expected will *invert* stability.
++
++  This is due to the definition of equality, given a < comparator:
++    (and (not (< x y))
++         (not (< y x)))
++  The definition is rather different, given a <= comparator:
++    (and (<= x y)
++         (<= x y))
++
+++ A "stable" merge is one that reliably favors one of its data sets
++  when equal items appear in both data sets. *All merge operations in
++  this library are stable*, breaking ties between data sets in favor
++  of the first data set -- elements of the first list come before equal 
++  elements in the second list.
++
++  So, if we are merging two lists of numbers ordered by absolute value
++  using the stable merge operation LIST-MERGE
++    (list-merge '(0 -2 4 8 -10) '(-1 3 -4 7)
++                (lambda (x y) (< (abs x) (abs y))))
++  reliably places the 4 of the first list before the equal-comparing -4
++  of the second list:
++    (0 -1 -2 4 -4 7 8 -10)
++
++In short, if your comparison function F answers true to (F x x), then 
++using a stable sorting or merging algorithm will not give you a stable sort
++or merge, and LIST-SORTED? may surprise you. Note that you can synthesize a <
++function from a <= function with
++    (lambda (x y) (not (<= y x)))
++if need be. 
++
++Precise definitions give sharp edges to tools, but require care
++in use. "Measure twice, cut once."
++
++I have adopted the choice of < from Common Lisp. I assume they
++had a good reason for adopting < instead of <=. I'd love to know
++what this reason is; send me email if you can explain it, please.
++
++** All vector operations accept optional subrange parameters
++============================================================
++The vector operations specified below all take optional START/END arguments
++indicating a selected subrange of a vector's elements. If a START parameter or
++START/END parameter pair is given to such a procedure, they must be exact,
++non-negative integers, such that
++    0 <= START <= END <= (VECTOR-LENGTH V)
++where V is the related vector parameter. If not specified, they default to 0
++and the length of the vector, respectively. They are interpreted to select the
++range [START,END), that is, all elements from index START (inclusive) up to,
++but not including, index END.
++
++** Required vs. allowed side-effects
++====================================
++LIST-SORT! and LIST-STABLE-SORT! are allowed, but not required,
++to alter their arguments' cons cells to construct the result list. This is
++consistent with the what-not-how character of the group of procedures
++to which they belong (the "sort-lib" package).
++
++The LIST-DELETE-NEIGHBOR-DUPS!, LIST-MERGE! and LIST-MERGE-SORT! procedures,
++on the other hand, provide specific algorithms, and, as such, explicitly
++commit to the use of side-effects on their input lists in order to guarantee
++their key algorithmic properties (e.g., linear-time operation, constant-space
++stack use).
++
++-------------------------------------------------------------------------------
++* Procedure specification
++-------------------------
++The procedures are split into several packages. In a Scheme system that has a
++module or package system, these procedures should be contained in modules
++named as follows:
++   Package name			Functionality
++   ------------			-------------
++   sort-lib			General sorting for lists & vectors
++   sorted?-lib			Sorted predicates for lists & vectors
++   list-merge-sort-lib		List merge sort
++   vector-merge-sort-lib	Vector merge sort
++   vector-heap-sort-lib		Vector heap sort
++   vector-quick-sort-lib	Vector quick sort
++   vector-insert-sort-lib	Vector insertion sort
++   delndup-lib			List and vector delete neighbor duplicates
++
++A Scheme system without a module system should provide all of the bindings
++defined in all of these modules as components of the "SRFI-32" package.
++
++Note that there is no list insert sort package, as you might as well always
++use list merge sort. The reference implementation's destructive list merge
++sort will do fewer SET-CDR!s than a destructive insert sort.
++
++** Procedure naming and functionality
++=====================================
++Almost all of the procedures described below are variants of two basic
++operations: sorting and merging. These procedures are consistently named
++by composing a set of basic lexemes to indicate what they do.
++
++Lexeme	  Meaning
++------	  -------
++"sort"	  The procedure sorts its input data set by some < comparison function.
++
++"merge"	  The procedure merges two ordered data sets into a single ordered
++	  result.
++
++"stable"  This lexeme indicates that the sort is a stable one.
++
++"vector"  The procedure operates upon vectors.
++
++"list"	  The procedure operates upon lists.
++
++"!"	  Procedures that end in "!" are allowed, and sometimes required, 
++	  to reuse their input storage to construct their answer.
++
++** Types of parameters and return values
++========================================
++In the procedures specified below,
++  - A LIS parameter is a list;
++      
++  - A V parameter is a vector;
++      
++  - A < or = parameter is a procedure accepting two arguments taken from the
++    specified procedure's data set(s), and returning a boolean;
++      
++  - START and END parameters are exact, non-negative integers that 
++    serve as vector indices selecting a subrange of some associated vector.
++    When specified, they must satisfy the relation
++        0 <= start <= end <= (vector-length v)
++    where V is the associated vector.
++
++Passing values to procedures with these parameters that do not satisfy these
++types is an error.
++
++If a procedure is said to return "unspecified," this means that nothing at all
++is said about what the procedure returns, not even the number of return
++values. Such a procedure is not even required to be consistent from call to
++call in the nature or number of its return values. It is simply required to
++return a value (or values) that may be passed to a command continuation, e.g.
++as the value of an expression appearing as a non-terminal subform of a BEGIN
++expression. Note that in R5RS, this restricts such a procedure to returning a
++single value; non-R5RS systems may not even provide this restriction.
++
++** sort-lib - general sorting package
++=====================================
++This library provides basic sorting and merging functionality suitable for
++general programming. The procedures are named by their semantic properties,
++i.e., what they do to the data (sort, stable sort, merge, and so forth).
++
++    Procedure						Suggested algorithm
++    -------------------------------------------------------------------------
++    list-sorted? lis < -> boolean
++    list-merge  lis1 lis2 < -> list
++    list-merge! lis1 lis2 < -> list
++    list-sort  lis < -> list				(vector heap or quick)
++    list-sort! lis < -> list				(list merge sort)
++    list-stable-sort  lis < -> list			(vector merge sort)
++    list-stable-sort! lis < -> list			(list merge sort)
++    list-delete-neighbor-dups  lis = -> list
++    list-delete-neighbor-dups! lis = -> list
++
++    vector-sorted? v < [start end]	-> boolean
++    vector-merge    v1 v2 < [start1 end1 start2 end2]       -> vector
++    vector-merge! v v1 v2 < [start start1 end1 start2 end2] -> unspecific
++    vector-sort  v < [start end] 	-> vector	(heap or quick sort)
++    vector-sort! v < [start end]	-> unspecific	(heap or quick sort)
++    vector-stable-sort  v < [start end] -> vector	(vector merge sort)
++    vector-stable-sort! v < [start end] -> unspecific	(vector merge sort)
++    vector-delete-neighbor-dups  v = [start end] -> vector
++    vector-delete-neighbor-dups! v = [start end] -> end'
++
++    LIST-SORTED? and VECTOR-SORTED? return true if their input list or vector
++    is in sorted order, as determined by their < comparison parameter.
++
++    All four merge operations are stable: an element of the initial list LIS1
++    or vector V1 will come before an equal-comparing element in the second
++    list LIS2 or vector V2 in the result.
++
++    The procedures
++      LIST-MERGE
++      LIST-SORT
++      LIST-STABLE-SORT
++      LIST-DELETE-NEIGHBOR-DUPS
++    do not alter their inputs and are allowed to return a value that shares 
++    a common tail with a list argument.
++
++    The procedures
++      LIST-SORT!
++      LIST-STABLE-SORT!
++    are "linear update" operators -- they are allowed, but not required, to
++    alter the cons cells of their arguments to produce their results. 
++
++    On the other hand, the procedures
++      LIST-DELETE-NEIGHBOR-DUPS!
++      LIST-MERGE!
++    make only a single, iterative, linear-time pass over their argument lists,
++    using SET-CDR!s to rearrange the cells of the lists into the final result
++    -- they work "in place." Hence, any cons cell appearing in the result must
++    have originally appeared in an input. The intent of this
++    iterative-algorithm commitment is to allow the programmer to be sure that
++    if, for example, LIST-MERGE! is asked to merge two ten-million-element
++    lists, the operation will complete without performing some extremely
++    (possibly twenty-million) deep recursion.
++
++    The vector procedures
++      VECTOR-SORT
++      VECTOR-STABLE-SORT
++      VECTOR-DELETE-NEIGHBOR-DUPS
++    do not alter their inputs, but allocate a fresh vector for their result,
++    of length END-START. 
++
++    The vector procedures
++      VECTOR-SORT!
++      VECTOR-STABLE-SORT!
++    sort their data in-place. (But note that VECTOR-STABLE-SORT! may 
++    allocate temporary storage proportional to the size of the input --
++    I am not aware of O(n lg n) stable vector sorting algorithms that
++    run in constant space.)
++
++    VECTOR-MERGE returns a vector of length (END1-START1)+(END2-START2).
++    
++    VECTOR-MERGE! writes its result into vector V, beginning at index START0,
++    for indices less than END0 = START0 + (END1-START1) + (END2-START2). The 
++    target subvector 
++      V[start0,end0)
++    may not overlap either source subvector 
++      V1[start1,end1)
++      V2[start2,end2).
++
++    The DELETE-NEIGHBOR-DUP-... procedures:
++    These procedures delete adjacent duplicate elements from a list or a
++    vector, using a given element-equality procedure. The first/leftmost
++    element of a run of equal elements is the one that survives. The list or
++    vector is not otherwise disordered.
++    
++    These procedures are linear time -- much faster than the O(n^2) general
++    duplicate-element deletors that do not assume any "bunching" of elements
++    (such as the ones provided by SRFI-1). If you want to delete duplicate
++    elements from a large list or vector, sort the elements to bring equal
++    items together, then use one of these procedures, for a total time of
++    O(n lg n).
++    
++    The comparison function = passed to these procedures is always applied
++      (= x y)
++    where X comes before Y in the containing list or vector.
++
++    - LIST-DELETE-NEIGHBOR-DUPS does not alter its input list; its answer
++      may share storage with the input list.
++
++    - VECTOR-DELETE-NEIGHBOR-DUPS does not alter its input vector, but
++      rather allocates a fresh vector to hold the result.
++
++    - LIST-DELETE-NEIGHBOR-DUPS! is permitted, but not required, to
++      mutate its input list in order to construct its answer.
++
++    - VECTOR-DELETE-NEIGHBOR-DUPS! reuses its input vector to hold the
++      answer, packing its answer into the index range [start,end'), where
++      END' is the non-negative exact integer returned as its value. It
++      returns END' as its result. The vector is not altered outside the range
++      [start,end').
++
++      [Maybe this procedure should take a "target" vector to write?]
++
++    - Examples:
++	(list-delete-neighbor-dups '(1 1 2 7 7 7 0 -2 -2) =)
++          => (1 2 7 0 -2)
++
++	(vector-delete-neighbor-dups '#(1 1 2 7 7 7 0 -2 -2) =)
++          => #(1 2 7 0 -2)
++
++	(vector-delete-neighbor-dups '#(1 1 2 7 7 7 0 -2 -2) = 3 7)
++          => #(7 0 -2)
++
++        ;; Result left in v[3,9):
++        (let ((v (vector 0 0 0 1 1 2 2 3 3 4 4 5 5 6 6)))
++          (cons (vector-delete-neighbor-dups! v = 3)
++                v))
++           => (9 . #(0 0 0 1 2 3 4 5 6 4 4 5 5 6 6))
++
++
++** Algorithm-specific sorting packages
++======================================
++These packages provide more specific sorting functionality, that is,
++specific committment to particular algorithms that have particular
++pragmatic consequences (such as memory locality, asymptotic running time)
++beyond their semantic behaviour (sorting, stable sorting, merging, etc.).
++Programmers that need a particular algorithm can use one of these packages.
++
++sorted?-lib - sorted predicates
++    list-sorted? lis <		   -> boolean
++    vector-sorted? v < [start end] -> boolean
++
++    Return #f iff there is an adjacent pair ... X Y ... in the input
++    list or vector such that Y < X. The optional START/END range 
++    arguments restrict VECTOR-SORTED? to the indicated subvector.
++
++list-merge-sort-lib - list merge sort
++    list-merge-sort  lis <	-> list
++    list-merge-sort! lis <	-> list
++    list-merge  lis1 lis2 <	-> list
++    list-merge! lis1 lis2 <	-> list
++
++    The sort procedures sort their data using a list merge sort, which is
++    stable. (The reference implementation is, additionally, a "natural" sort.
++    See below for the properties of this algorithm.)
++
++    The ! procedures are destructive -- they use SET-CDR!s to rearrange the
++    cells of the lists into the proper order. As such, they do not allocate
++    any extra cons cells -- they are "in place" sorts. Additionally,
++    LIST-MERGE! is iterative, not recursive -- it can operate on arguments of
++    arbitrary size without requiring an unbounded amount of stack space.
++
++    The merge operations are stable: an element of LIS1 will come before an
++    equal-comparing element in LIS2 in the result list.
++
++vector-merge-sort-lib - vector merge sort
++    vector-merge-sort  v < [start end temp]			-> vector
++    vector-merge-sort! v < [start end temp]			-> unspecific
++    vector-merge  v1 v2 < [start1 end1 start2 end2]		-> vector
++    vector-merge! v v1 v2 < [start0 start1 end1 start2 end2]	-> unspecific
++
++    The sort procedures sort their data using vector merge sort, which is
++    stable. (The reference implementation is, additionally, a "natural" sort.
++    See below for the properties of this algorithm.)
++
++    The optional START/END arguments provide for sorting of subranges, and
++    default to 0 and the length of the corresponding vector.
++    
++    Merge-sorting a vector requires the allocation of a temporary "scratch"
++    work vector for the duration of the sort. This scratch vector can be
++    passed in by the client as the optional TEMP argument; if so, the supplied
++    vector must be of size >= END, and will not be altered outside the range
++    [start,end). If not supplied, the sort routines allocate one themselves.
++
++    The merge operations are stable: an element of V1 will come before an
++    equal-comparing element in V2 in the result vector.
++
++    VECTOR-MERGE-SORT! leaves its result in V[start,end).
++
++    VECTOR-MERGE-SORT returns a vector of length END-START.
++    
++    VECTOR-MERGE returns a vector of length (END1-START1)+(END2-START2).
++    
++    VECTOR-MERGE! writes its result into vector V, beginning at index START0,
++    for indices less than END0 = START0 + (END1-START1) + (END2-START2). The 
++    target subvector 
++      V[start0,end0)
++    may not overlap either source subvector 
++      V1[start1,end1)
++      V2[start2,end2).
++
++vector-heap-sort-lib - vector heap sort
++    heap-sort  v < [start end] -> vector
++    heap-sort! v < [start end] -> unspecific
++
++    These procedures sort their data using heap sort, 
++    which is not a stable sorting algorithm.
++    
++    HEAP-SORT returns a vector of length END-START. 
++    HEAP-SORT! is in-place, leaving its result in V[start,end).
++
++vector-quick-sort-lib - vector quick sort
++    quick-sort  v < [start end] -> vector
++    quick-sort! v < [start end]	-> unspecific
++
++    These procedures sort their data using quick sort, 
++    which is not a stable sorting algorithm.
++    
++    QUICK-SORT returns a vector of length END-START. 
++    QUICK-SORT! is in-place, leaving its result in V[start,end).
++
++vector-insert-sort-lib - vector insertion sort
++    insert-sort  v < [start end] -> vector
++    insert-sort! v < [start end] -> unspecific
++    
++    These procedures stably sort their data using insertion sort.
++    
++    INSERT-SORT returns a vector of length END-START.
++    INSERT-SORT! is in-place, leaving its result in V[start,end).
++
++delndup-lib - list and vector delete neighbor duplicates
++    list-delete-neighbor-dups  lis = -> list
++    list-delete-neighbor-dups! lis = -> list
++    
++    vector-delete-neighbor-dups  v = [start end] -> vector
++    vector-delete-neighbor-dups! v = [start end] -> end'
++
++    These procedures delete adjacent duplicate elements from a list or
++    a vector, using a given element-equality procedure =. The first/leftmost
++    element of a run of equal elements is the one that survives. The list
++    or vector is not otherwise disordered.
++
++    These procedures are linear time -- much faster than the O(n^2) general
++    duplicate-element deletors that do not assume any "bunching" of elements
++    (such as the ones provided by SRFI-1). If you want to delete duplicate
++    elements from a large list or vector, sort the elements to bring equal
++    items together, then use one of these procedures, for a total time of
++    O(n lg n).
++    
++    The comparison function = passed to these procedures is always applied
++      (= x y)
++    where X comes before Y in the containing list or vector.
++
++    LIST-DELETE-NEIGHBOR-DUPS does not alter its input list; its answer
++    may share storage with the input list.
++
++    VECTOR-DELETE-NEIGHBOR-DUPS does not alter its input vector, but
++    rather allocates a fresh vector to hold the result.
++
++    LIST-DELETE-NEIGHBOR-DUPS! is permitted, but not required, to
++    mutate its input list in order to construct its answer.
++
++    VECTOR-DELETE-NEIGHBOR-DUPS! reuses its input vector to hold the
++    answer, packing its answer into the index range [start,end'), where
++    END' is the non-negative exact integer returned as its value. It
++    returns END' as its result. The vector is not altered outside the range
++    [start,end').
++
++    Examples:
++	(list-delete-neighbor-dups '(1 1 2 7 7 7 0 -2 -2) =)
++          => (1 2 7 0 -2)
++
++	(vector-delete-neighbor-dups '#(1 1 2 7 7 7 0 -2 -2) =)
++          => #(1 2 7 0 -2)
++
++	(vector-delete-neighbor-dups '#(1 1 2 7 7 7 0 -2 -2) = 3 7)
++          => #(7 0 -2)
++
++        ;; Result left in v[3,9):
++        (let ((v (vector 0 0 0 1 1 2 2 3 3 4 4 5 5 6 6)))
++          (cons (vector-delete-neighbor-dups! v = 3)
++                v))
++           => (9 . #(0 0 0 1 2 3 4 5 6 4 4 5 5 6 6))
++
++
++-------------------------------------------------------------------------------
++* Algorithmic properties
++------------------------
++Different sort and merge algorithms have different properties.
++Choose the algorithm that matches your needs:
++
++Vector insert sort
++    Stable, but only suitable for small vectors -- O(n^2).
++
++Vector quick sort
++    Not stable. Is fast on average -- O(n lg n) -- but has bad worst-case
++    behaviour. Has good memory locality for big vectors (unlike heap sort). 
++    A clever pivot-picking trick (median of three samples) helps avoid 
++    worst-case behaviour, but pathological cases can still blow up.
++
++Vector heap sort
++    Not stable. Guaranteed fast -- O(n lg n) *worst* case. Poor locality
++    on large vectors. A very reliable workhorse.
++
++Vector merge sort
++    Stable. Not in-place -- requires a temporary buffer of equal size. 
++    Fast -- O(n lg n) -- and has good memory locality for large vectors.
++    
++    The implementation of vector merge sort provided by this SRFI's reference
++    implementation is, additionally, a "natural" sort, meaning that it
++    exploits existing order in the input data, providing O(n) best case.
++
++Destructive list merge sort
++    Stable, fast and in-place (i.e., allocates no new cons cells). "Fast"
++    means O(n lg n) worse-case, and substantially better if the data
++    is already mostly ordered, all the way down to linear time for
++    a completely-ordered input list (i.e., it is a "natural" sort).
++
++    Note that sorting lists involves chasing pointers through memory, which
++    can be a loser on modern machine architectures because of poor cache &
++    page locality. Pointer *writing*, which is what the SET-CDR!s of a
++    destructive list-sort algorithm do, is even worse, especially if your
++    Scheme has a generational GC -- the writes will thrash the write-barrier.
++    Sorting vectors has inherently better locality.
++
++    This SRFIs destructive list merge and merge sort implementations are
++    opportunistic -- they avoid redundant SET-CDR!s, and try to take long
++    already-ordered runs of list structure as-is when doing the merges.
++
++Pure list merge sort
++    Stable and fast -- O(n lg n) worst-case, and possibly better, depending
++    upon the input list (see above).
++
++
++Algorithm  Stable?  Worst case  Average case  In-place
++------------------------------------------------------
++V insert   Yes      O(n^2)      O(n^2)        Yes
++V quick    No       O(n^2)      O(n lg n)     Yes
++V heap     No       O(n lg n)   O(n lg n)     Yes
++V merge    Yes      O(n lg n)   O(n lg n)     No
++L merge    Yes      O(n lg n)   O(n lg n)     Either
++
++
++-------------------------------------------------------------------------------
++* Topics to be resolved during discussion phase
++-----------------------------------------------
++I particularly solicit comments about the following topics.
++
++- Include VECTOR-BINARY-SEARCH ?
++  Should we include
++    (VECTOR-BINARY-SEARCH v key< elt->key key [start end])
++  in the SRFI? It sort of goes with sorting; it's exactly ten lines of code.
++
++- Comparison function before or after the list/vector argument?
++  Should it be
++    (list-sort < lis)
++  or
++    (list-sort lis <)
++  There is overwhelming consistency among the implementations: data first, 
++  < after. Only Chez does it differently.
++
++  I have done it in the backwards-compatible way. But I prefer the < first,
++  data after way.
++
++
++-------------------------------------------------------------------------------
++* Porting and optimisation
++--------------------------
++This package should be trivial to port. There are only four non-R4RS bits
++in the code:
++- Use of multiple-value return, with the R5RS VALUES procedure, and the
++  simple (RECEIVE (var ...) mv-exp body ...) multiple-value binding macro.
++
++- A VECTOR-COPY procedure. This is a tiny little procedure:
++    (vector-copy v [start end])
++
++- Use of the LET-OPTIONALS macro from scsh to parse and default optional
++  arguments to three routines. Again, easy to port the macro or rewrite
++  the code to parse, default, and error check the args by hand. 
++
++- Calls to an ERROR function for complaining about bad arguments.
++
++This code is tightly bummed, as far as I can go in portable Scheme.
++
++You could speed up the vector code a lot by error-checking the procedure
++parameters and then shifting over to fixnum-specific arithmetic and
++dangerous vector-indexing and vector-setting primitives. The comments
++in the code indicate where the initial error checks would have to be
++added. There are several (QUOTIENT N 2)'s that could be changed to a
++fixnum right-shift, as well, in both the list and vector code. The code
++is designed to enable this -- each file usually exports one or two "safe"
++procedures that end up calling an internal "dangerous" primitive. The
++little exported cover procedures are where you move the error checks.
++
++This should provide *big* speedups. In fact, all the code bumming I've done
++pretty much disappears in the noise unless you have a good compiler and also
++can dump the vector-index checks and generic arithmetic -- so I've really just
++set things up for you to exploit.
++
++The optional-arg parsing, defaulting, and error checking is done with a
++portable R4RS macro. But if your Scheme has a faster mechanism (e.g., Chez),
++you should definitely port over to it. Note that argument defaulting and
++error-checking are interleaved -- you don't have to error-check defaulted
++START/END args to see if they are fixnums that are legal vector indices for
++the corresponding vector, etc.
++
++
++-------------------------------------------------------------------------------
++* References & Links
++--------------------
++
++This document, in HTML:
++    http://srfi.schemers.org/srfi-32/srfi-32.html
++    [This link may not be valid while the SRFI is in draft form.]
++
++This document, in simple text format:
++    http://srfi.schemers.org/srfi-32/srfi-32.txt
++
++Archive of SRFI-32 discussion-list email:
++    http://srfi.schemers.org/srfi-32/mail-archive/maillist.html
++
++SRFI web site:
++    http://srfi.schemers.org/
++
++[CommonLisp]
++    Common Lisp: the Language
++    Guy L. Steele Jr. (editor).
++    Digital Press, Maynard, Mass., second edition 1990.
++    Available at http://www.elwood.com/alu/table/references.htm#cltl2
++
++    The Common Lisp "HyperSpec," produced by Kent Pitman, is essentially
++    the ANSI spec for Common Lisp:
++    http://www.xanalys.com/software_tools/reference/HyperSpec/
++
++[R5RS]
++    Revised^5 Report on the Algorithmic Language Scheme, 
++    R. Kelsey, W. Clinger, J. Rees (editors).
++    Higher-Order and Symbolic Computation, Vol. 11, No. 1, September, 1998.
++    and ACM SIGPLAN Notices, Vol. 33, No. 9, October, 1998.
++
++    Available at http://www.schemers.org/Documents/Standards/
++
++
++-------------------------------------------------------------------------------
++* Acknowledgements
++------------------
++
++I thank the authors of the open source I consulted when designing this
++library, particularly Richard O'Keefe, Donovan Kolby and the MIT Scheme Team.
++
++
++-------------------------------------------------------------------------------
++* Copyright
++-----------
++
++** SRFI text
++============
++This document is copyright (C) Olin Shivers (1998, 1999). 
++All Rights Reserved. 
++
++Permission is hereby granted, free of charge, to any person obtaining
++a copy of this software and associated documentation files (the
++"Software"), to deal in the Software without restriction, including
++without limitation the rights to use, copy, modify, merge, publish,
++distribute, sublicense, and/or sell copies of the Software, and to
++permit persons to whom the Software is furnished to do so, subject to
++the following conditions:
++
++The above copyright notice and this permission notice shall be
++included in all copies or substantial portions of the Software.
++
++THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
++MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
++LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
++OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
++WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
++
++** Reference implementation
++===========================
++Short summary: no restrictions.
++
++While I wrote all of this code myself, I read a lot of code before I began
++writing. However, all such code is, itself, either open source or public
++domain, rendering irrelevant any issue of "copyright taint."
++
++The natural merge sorts (pure list, destructive list, and vector) are not only
++my own code, but are implementations of an algorithm of my own devising. They
++run in O(n lg n) worst case, O(n) best case, and require only a logarithmic
++number of stack frames. And they are stable. And the destructive-list variant
++allocates zero cons cells; it simply rearranges the cells of the input list.
++
++Hence the reference implementation is
++    Copyright (c) 1998 by Olin Shivers.
++and made available under the same copyright as the SRFI text (see above).
+diff -urN racket-6.12-orig/share/pkgs/srfi-lib/srfi/%3a5/let.rkt racket-6.12/share/pkgs/srfi-lib/srfi/%3a5/let.rkt
+--- racket-6.12-orig/share/pkgs/srfi-lib/srfi/%3a5/let.rkt	2018-01-26 15:34:52.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-lib/srfi/%3a5/let.rkt	1969-12-31 19:00:00.000000000 -0500
+@@ -1 +0,0 @@
+-#lang s-exp srfi/provider srfi/%3a5
+diff -urN racket-6.12-orig/share/pkgs/srfi-lib/srfi/%3a5.rkt racket-6.12/share/pkgs/srfi-lib/srfi/%3a5.rkt
+--- racket-6.12-orig/share/pkgs/srfi-lib/srfi/%3a5.rkt	2018-01-26 15:34:52.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-lib/srfi/%3a5.rkt	1969-12-31 19:00:00.000000000 -0500
+@@ -1,3 +0,0 @@
+-#lang s-exp srfi/provider srfi/5
+-
+-;; FIXME: "rest arguments" need to generate mutable lists
+diff -urN racket-6.12-orig/share/pkgs/srfi-lib/srfi/5/let.rkt racket-6.12/share/pkgs/srfi-lib/srfi/5/let.rkt
+--- racket-6.12-orig/share/pkgs/srfi-lib/srfi/5/let.rkt	2018-01-26 15:34:52.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-lib/srfi/5/let.rkt	1969-12-31 19:00:00.000000000 -0500
+@@ -1,86 +0,0 @@
+-;;;
+-;;; <let.rkt> ---- SRFI 5 A compatible let form with signatures and rest arguments
+-;;; Time-stamp: <03/04/08 09:56:06 solsona>
+-;;;
+-;;; Usually, I would add a copyright notice, and the announce that
+-;;; this code is under the LGPL licence.  Nevertheless, I only did the
+-;;; port to PLT Scheme v200, and here is the copyright notice,
+-;;; comments, and licence from the original source:
+-;;;
+-;;; Copyright (C) Andy Gaynor (1999-2003)
+-;;;
+-;;; The version of my-let here was cleaned up by: Paul Schlie <schlie@attbi.com>.
+-;;; Renamed to s:let by Eli Barzilay
+-
+-#lang scheme/base
+-(provide s:let)
+-
+-(define-syntax s:let
+-  (syntax-rules ()
+-    ;; standard
+-    ((s:let () body ...)
+-     (let () body ...))
+-    ((s:let ((var val) ...) body ...)
+-     (let ((var val) ...) body ...))
+-
+-    ;; rest style
+-    ((s:let ((var val) . bindings) body ...)
+-     (let-loop #f bindings (var) (val) (body ...)))
+-
+-    ;; signature style
+-    ((s:let (name bindings ...) body ...)
+-     (let-loop name (bindings ...) () () (body ...)))
+-
+-    ;; standard named style
+-    ((s:let name (bindings ...) body ...)
+-     (let-loop name (bindings ...) () () (body ...)))
+-
+-    ))
+-
+-;; A loop to walk down the list of bindings.
+-
+-(define-syntax let-loop
+-  (syntax-rules ()
+-
+-    ;; No more bindings - make a LETREC.
+-    ((let-loop name () (vars ...) (vals ...) body)
+-     ((letrec ((name (lambda (vars ...) . body)))
+-        name)
+-      vals ...))
+-
+-    ;; Rest binding, no name
+-    ((let-loop #f (rest-var rest-val ...) (var ...) (val ...) body)
+-     (let ((var val) ... (rest-var (list rest-val ...))) . body))
+-
+-    ;; Process a (var val) pair.
+-    ((let-loop name ((var val) more ...) (vars ...)     (vals ...)     body)
+-     (let-loop name (more ...)           (vars ... var) (vals ... val) body))
+-
+-    ;; End with a rest variable - make a LETREC.
+-    ((let-loop name (rest-var rest-vals ...) (vars ...) (vals ...) body)
+-     ((letrec ((name (lambda (vars ... . rest-var) . body)))
+-        name)
+-      vals ... rest-vals ...))))
+-
+-;; Four loops - normal and `signature-style', each with and without a rest
+-;; binding.
+-;;
+-;;(let fibonacci ((n 10) (i 0) (f0 0) (f1 1))
+-;;  (if (= i n)
+-;;      f0
+-;;      (fibonacci n (+ i 1) f1 (+ f0 f1))))
+-;;
+-;;(let (fibonacci (n 10) (i 0) (f0 0) (f1 1))
+-;;  (if (= i n)
+-;;      f0
+-;;      (fibonacci n (+ i 1) f1 (+ f0 f1))))
+-;;
+-;;(let fibonacci ((n 10) (i 0) . (f 0 1))
+-;;  (if (= i n)
+-;;      (car f)
+-;;      (fibonacci n (+ i 1) (cadr f) (+ (car f) (cadr f)))))
+-;;
+-;;(let (fibonacci (n 10) (i 0) . (f 0 1))
+-;;  (if (= i n)
+-;;      (car f)
+-;;      (fibonacci n (+ i 1) (cadr f) (+ (car f) (cadr f)))))
+diff -urN racket-6.12-orig/share/pkgs/srfi-lib/srfi/5.rkt racket-6.12/share/pkgs/srfi-lib/srfi/5.rkt
+--- racket-6.12-orig/share/pkgs/srfi-lib/srfi/5.rkt	2018-01-26 15:34:52.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-lib/srfi/5.rkt	1969-12-31 19:00:00.000000000 -0500
+@@ -1,2 +0,0 @@
+-;; module loader for SRFI-5
+-#lang s-exp srfi/provider srfi/5/let #:unprefix s:
+diff -urN racket-6.12-orig/share/pkgs/srfi-lib-nonfree/info.rkt racket-6.12/share/pkgs/srfi-lib-nonfree/info.rkt
+--- racket-6.12-orig/share/pkgs/srfi-lib-nonfree/info.rkt	1969-12-31 19:00:00.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-lib-nonfree/info.rkt	2018-01-31 12:22:58.159501944 -0500
+@@ -0,0 +1,14 @@
++#lang info
++
++(define collection 'multi)
++
++(define deps '("scheme-lib"
++               "base"
++               "r6rs-lib"
++               "srfi-lib"
++               "compatibility-lib"))
++
++
++(define pkg-desc "implementation (no documentation) part of \"srfi nonfree\"")
++
++(define pkg-authors '(mflatt noel chongkai jay))
+diff -urN racket-6.12-orig/share/pkgs/srfi-lib-nonfree/srfi/%3a5/let.rkt racket-6.12/share/pkgs/srfi-lib-nonfree/srfi/%3a5/let.rkt
+--- racket-6.12-orig/share/pkgs/srfi-lib-nonfree/srfi/%3a5/let.rkt	1969-12-31 19:00:00.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-lib-nonfree/srfi/%3a5/let.rkt	2018-01-31 12:22:58.159501944 -0500
+@@ -0,0 +1 @@
++#lang s-exp srfi/provider srfi/%3a5
+diff -urN racket-6.12-orig/share/pkgs/srfi-lib-nonfree/srfi/%3a5.rkt racket-6.12/share/pkgs/srfi-lib-nonfree/srfi/%3a5.rkt
+--- racket-6.12-orig/share/pkgs/srfi-lib-nonfree/srfi/%3a5.rkt	1969-12-31 19:00:00.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-lib-nonfree/srfi/%3a5.rkt	2018-01-31 12:22:58.159501944 -0500
+@@ -0,0 +1,3 @@
++#lang s-exp srfi/provider srfi/5
++
++;; FIXME: "rest arguments" need to generate mutable lists
+diff -urN racket-6.12-orig/share/pkgs/srfi-lib-nonfree/srfi/5/let.rkt racket-6.12/share/pkgs/srfi-lib-nonfree/srfi/5/let.rkt
+--- racket-6.12-orig/share/pkgs/srfi-lib-nonfree/srfi/5/let.rkt	1969-12-31 19:00:00.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-lib-nonfree/srfi/5/let.rkt	2018-01-31 12:22:58.159501944 -0500
+@@ -0,0 +1,86 @@
++;;;
++;;; <let.rkt> ---- SRFI 5 A compatible let form with signatures and rest arguments
++;;; Time-stamp: <03/04/08 09:56:06 solsona>
++;;;
++;;; Usually, I would add a copyright notice, and the announce that
++;;; this code is under the LGPL licence.  Nevertheless, I only did the
++;;; port to PLT Scheme v200, and here is the copyright notice,
++;;; comments, and licence from the original source:
++;;;
++;;; Copyright (C) Andy Gaynor (1999-2003)
++;;;
++;;; The version of my-let here was cleaned up by: Paul Schlie <schlie@attbi.com>.
++;;; Renamed to s:let by Eli Barzilay
++
++#lang scheme/base
++(provide s:let)
++
++(define-syntax s:let
++  (syntax-rules ()
++    ;; standard
++    ((s:let () body ...)
++     (let () body ...))
++    ((s:let ((var val) ...) body ...)
++     (let ((var val) ...) body ...))
++
++    ;; rest style
++    ((s:let ((var val) . bindings) body ...)
++     (let-loop #f bindings (var) (val) (body ...)))
++
++    ;; signature style
++    ((s:let (name bindings ...) body ...)
++     (let-loop name (bindings ...) () () (body ...)))
++
++    ;; standard named style
++    ((s:let name (bindings ...) body ...)
++     (let-loop name (bindings ...) () () (body ...)))
++
++    ))
++
++;; A loop to walk down the list of bindings.
++
++(define-syntax let-loop
++  (syntax-rules ()
++
++    ;; No more bindings - make a LETREC.
++    ((let-loop name () (vars ...) (vals ...) body)
++     ((letrec ((name (lambda (vars ...) . body)))
++        name)
++      vals ...))
++
++    ;; Rest binding, no name
++    ((let-loop #f (rest-var rest-val ...) (var ...) (val ...) body)
++     (let ((var val) ... (rest-var (list rest-val ...))) . body))
++
++    ;; Process a (var val) pair.
++    ((let-loop name ((var val) more ...) (vars ...)     (vals ...)     body)
++     (let-loop name (more ...)           (vars ... var) (vals ... val) body))
++
++    ;; End with a rest variable - make a LETREC.
++    ((let-loop name (rest-var rest-vals ...) (vars ...) (vals ...) body)
++     ((letrec ((name (lambda (vars ... . rest-var) . body)))
++        name)
++      vals ... rest-vals ...))))
++
++;; Four loops - normal and `signature-style', each with and without a rest
++;; binding.
++;;
++;;(let fibonacci ((n 10) (i 0) (f0 0) (f1 1))
++;;  (if (= i n)
++;;      f0
++;;      (fibonacci n (+ i 1) f1 (+ f0 f1))))
++;;
++;;(let (fibonacci (n 10) (i 0) (f0 0) (f1 1))
++;;  (if (= i n)
++;;      f0
++;;      (fibonacci n (+ i 1) f1 (+ f0 f1))))
++;;
++;;(let fibonacci ((n 10) (i 0) . (f 0 1))
++;;  (if (= i n)
++;;      (car f)
++;;      (fibonacci n (+ i 1) (cadr f) (+ (car f) (cadr f)))))
++;;
++;;(let (fibonacci (n 10) (i 0) . (f 0 1))
++;;  (if (= i n)
++;;      (car f)
++;;      (fibonacci n (+ i 1) (cadr f) (+ (car f) (cadr f)))))
+diff -urN racket-6.12-orig/share/pkgs/srfi-lib-nonfree/srfi/5.rkt racket-6.12/share/pkgs/srfi-lib-nonfree/srfi/5.rkt
+--- racket-6.12-orig/share/pkgs/srfi-lib-nonfree/srfi/5.rkt	1969-12-31 19:00:00.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-lib-nonfree/srfi/5.rkt	2018-01-31 12:22:58.159501944 -0500
+@@ -0,0 +1,2 @@
++;; module loader for SRFI-5
++#lang s-exp srfi/provider srfi/5/let #:unprefix s:
+diff -urN racket-6.12-orig/share/pkgs/srfi-lite-lib/info.rkt racket-6.12/share/pkgs/srfi-lite-lib/info.rkt
+--- racket-6.12-orig/share/pkgs/srfi-lite-lib/info.rkt	2018-01-26 16:10:04.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-lite-lib/info.rkt	2018-01-31 12:22:58.160501940 -0500
+@@ -1 +1,9 @@
+-(module info setup/infotab (#%module-begin (define package-content-state (quote (built "6.12"))) (define collection (quote multi)) (define deps (quote ("base"))) (define pkg-desc "implementation of the most widely used \"srfi\" libraries") (define pkg-authors (quote (mflatt)))))
++#lang info
++
++(define collection 'multi)
++
++(define deps '("base"))
++
++(define pkg-desc "implementation of the most widely used \"srfi\" libraries")
++
++(define pkg-authors '(mflatt))
+Binary files racket-6.12-orig/share/pkgs/srfi-lite-lib/.info.rkt.swp and racket-6.12/share/pkgs/srfi-lite-lib/.info.rkt.swp differ
+diff -urN racket-6.12-orig/share/pkgs/srfi-lite-lib/srfi/29/localization.rkt racket-6.12/share/pkgs/srfi-lite-lib/srfi/29/localization.rkt
+--- racket-6.12-orig/share/pkgs/srfi-lite-lib/srfi/29/localization.rkt	2018-01-26 15:34:52.000000000 -0500
++++ racket-6.12/share/pkgs/srfi-lite-lib/srfi/29/localization.rkt	2018-01-31 12:22:58.162501933 -0500
+@@ -2,6 +2,7 @@
+   
+   (require racket/contract/base
+            racket/file
++           racket/list
+            (only-in racket/runtime-path define-runtime-path)
+            racket/string racket/format
+            syntax/modread
+@@ -113,10 +114,6 @@
+                                  (lambda ()
+                                    (with-input-from-file path read))))
+                #t))))
+-  (define (rdc ls)
+-    (if (null? (cdr ls))
+-        '()
+-        (cons (car ls) (rdc (cdr ls)))))
+   
+   ;;Retrieve a localized template given its package name and a template name
+   (define (localized-template package-name template-name)
+@@ -127,5 +124,5 @@
+            (let ((bundle (hash-ref *localization-bundles* specifier #f)))
+              (cond ((and bundle (assq template-name bundle)) => cdr)
+                    ((null? (cdr specifier)) #f)
+-                   (else (loop (rdc specifier))))))))
++                   (else (loop (drop-right specifier 1))))))))
+   )
